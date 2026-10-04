@@ -928,12 +928,26 @@ def _resolve_provider_prefix(model_name: str) -> Optional[tuple[str, str]]:
     return None
 
 
+def _is_openai_backed_provider(provider: Optional[str]) -> bool:
+    """True for the providers that can serve OpenAI first-party model ids natively (ChatGPT/Codex
+    subscription or the OpenAI API) — the only ones entitled to advertise GPT-6 Astra."""
+    return normalize_provider(provider) in {"openai", "openai-api", "openai-codex"}
+
+
 def detect_provider_for_model(
     model_name: str, current_provider: str) -> Optional[tuple[str, str]]:
     """Auto-detect the best provider for a model name: static catalogs (bare provider name → its
     default; direct catalog match), then the OpenRouter catalog, then a configured ``vendor/`` prefix."""
     name = (model_name or "").strip()
     if not name:
+        return None
+
+    # GPT-6 Astra is deliberately absent from the offline/static catalogs (its entitlement is
+    # account-scoped and only the live /models listing may advertise it), so a bare ``gpt-6-astra``
+    # re-selected on an OpenAI-backed provider must never fall through to the OpenRouter lookup
+    # below: ``openai/gpt-6-astra`` IS in the OpenRouter catalog, and switching there silently
+    # drops a ChatGPT-subscription session onto a metered (and usually unauthenticated) endpoint.
+    if is_astra_model(name) and "/" not in name and _is_openai_backed_provider(current_provider):
         return None
 
     static_match = detect_static_provider_for_model(name, current_provider)

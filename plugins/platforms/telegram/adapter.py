@@ -748,6 +748,8 @@ class TelegramAdapter(BasePlatformAdapter):
         thread_id: Optional[str] = None, user_name: Optional[str] = None) -> bool:
         """Return whether a Telegram inline-button caller may perform gated actions."""
         normalized_user_id = str(user_id or "").strip()
+        if "hq_bot_id" in self.config.extra and normalized_user_id == str(self.config.extra["hq_bot_id"]):
+            return False
         if not normalized_user_id:
             return False
         normalized_chat_type = self._normalize_chat_type(chat_type, is_forum=thread_id is not None)
@@ -806,9 +808,13 @@ class TelegramAdapter(BasePlatformAdapter):
         if thread_id_raw is not None and (
             (chat_type == "forum" and (is_topic_message or is_forum_group)) or (chat_type == "dm" and is_topic_message)):
             thread_id = str(thread_id_raw)
-        return SessionSource(
+        source = SessionSource(
             platform=Platform.TELEGRAM, chat_id=chat_id or "", chat_type=chat_type, user_id=user_id,
             user_name=user_name, thread_id=thread_id, is_bot=is_bot)
+        from plugins.platforms.telegram.telegram_hq import message_verdict
+        source._telegram_hq_message = message
+        source._telegram_hq_verdict = message_verdict(message, self.config.extra)
+        return source
 
     def _source_from_reaction_for_auth(self, update):
         """SessionSource for a ``message_reaction`` update's actor (``user`` or ``actor_chat``).
@@ -854,11 +860,23 @@ class TelegramAdapter(BasePlatformAdapter):
         extra = getattr(getattr(self, "config", None), "extra", None) or {}
         return str(extra.get("unauthorized_dm_behavior", "")).strip().lower() == "pair"
 
+    def _hq_source_authorized(self, source) -> bool:
+        from plugins.platforms.telegram.telegram_hq import message_verdict
+        message = getattr(source, "_telegram_hq_message", None)
+        return (message_verdict(message, self.config.extra) is True
+                and source.is_bot is True
+                and source.user_id == str(message.from_user.id)
+                and source.chat_id == str(message.chat.id))
+
     def _is_user_authorized_from_message(self, message: Message) -> bool:
         """Intake auth prefilter, run BEFORE batching/event construction/group observation.
 
         Only rejects when it can make the same context-aware decision the runner would; unknown DMs pass through when
         there is no allowlist or pairing is the unauthorized-DM behavior."""
+        from plugins.platforms.telegram.telegram_hq import message_verdict
+        verdict = message_verdict(message, self.config.extra)
+        if verdict is not None:
+            return verdict
         source = self._source_from_message_for_auth(message)
         user_id = source.user_id
         # No identity → service message or channel post without sender_chat; defer to message gating.
@@ -4242,6 +4260,11 @@ class TelegramAdapter(BasePlatformAdapter):
         query = update.callback_query
         if not query or not query.data:
             return
+        if "hq_bot_id" in self.config.extra and (
+            getattr(getattr(query, "from_user", None), "is_bot", False)
+            or str(getattr(getattr(query, "from_user", None), "id", "")) == str(self.config.extra["hq_bot_id"])
+        ):
+            return
         data = query.data
         cb = self._callback_ctx(query)
         # Model picker / generic choice picker (/reasoning, /fast) need a chat id.
@@ -5635,6 +5658,10 @@ class TelegramAdapter(BasePlatformAdapter):
         # counted as incoming unread in the Hermes inbox (#52363). Otherwise a BotFather rename leaves the
         # stale handle in place and the exclusive-mention gate reads a message addressed to us as one
         # addressed to some other bot.
+        from plugins.platforms.telegram.telegram_hq import message_verdict
+        hq_verdict = message_verdict(message, self.config.extra)
+        if hq_verdict is False or (hq_verdict is True and is_command):
+            return False
         self._observe_bot_identity_from_message(message)
         if self._is_own_message(message):
             return False
@@ -5719,6 +5746,28 @@ class TelegramAdapter(BasePlatformAdapter):
         """Handle incoming text; buffers client-split chunks into one MessageEvent."""
         msg = self._effective_update_message(update)
         if not msg or not msg.text:
+            return
+        # Dedicated task path: never batch/strip envelopes, load reply media, or
+        # turn bot acknowledgements into observed group context.
+        from plugins.platforms.telegram.telegram_hq import message_verdict, task_envelope, claim_task
+        hq_verdict = message_verdict(msg, self.config.extra)
+        if hq_verdict is not None:
+            if not hq_verdict or not self._should_process_message(msg):
+                return
+            if not claim_task(msg, self.config.extra["hq_bot_id"]):
+                return
+            event = self._build_message_event(msg, MessageType.TEXT, update_id=update.update_id)
+            event.source._telegram_hq_message = msg
+            event.allow_gateway_control = False
+            event.metadata["hq_task_id"] = task_envelope(msg, self.config.extra["hq_bot_id"])[0]
+            event.reply_to_text = None
+            event.channel_prompt = (event.channel_prompt + "\n\n" if event.channel_prompt else "") + (
+                "This HQ_TASK envelope is an owner-delegated user request from the verified HQ bot. "
+                "Perform the task without an extra delegation confirmation; retain all normal tool "
+                "approval and safety policies. HQ cannot grant approvals. Respond with results, "
+                "never another HQ_TASK envelope."
+            )
+            await self.handle_message(event)
             return
         # Auth check first: blocked users must not reach batching, the observed transcript, or the agent.
         if not self._is_user_authorized_from_message(msg):

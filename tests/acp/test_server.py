@@ -61,7 +61,8 @@ def agent(mock_manager):
 async def test_new_session_exposes_edit_approvals_as_modes_not_config_options(agent):
     resp = await agent.new_session(cwd="/tmp")
 
-    assert resp.config_options is None
+    # Only the reasoning-effort ``thought_level`` select is a config option; edit approvals stay modes.
+    assert [opt.id for opt in resp.config_options] == ["reasoning_effort"]
     assert isinstance(resp.modes, SessionModeState)
     assert resp.modes.current_mode_id == "default"
     assert [(mode.id, mode.name) for mode in resp.modes.available_modes] == [
@@ -82,8 +83,79 @@ async def test_set_config_option_persists_edit_approval_policy_without_advertisi
     state = agent.session_manager.get_session(resp.session_id)
 
     assert isinstance(update, SetSessionConfigOptionResponse)
-    assert update.config_options == []
+    assert [opt.id for opt in update.config_options] == ["reasoning_effort"]
     assert getattr(state, "mode", None) == "accept_edits"
+
+
+# ---------------------------------------------------------------------------
+# reasoning effort (ACP ``thought_level`` config option)
+# ---------------------------------------------------------------------------
+
+
+def _effort_option(options):
+    return next(opt for opt in options if opt.id == "reasoning_effort")
+
+
+@pytest.mark.asyncio
+async def test_new_session_advertises_reasoning_effort_thought_level_select(agent):
+    from hermes_constants import VALID_REASONING_EFFORTS
+
+    resp = await agent.new_session(cwd="/tmp")
+    opt = _effort_option(resp.config_options)
+
+    assert opt.category == "thought_level"
+    assert opt.type == "select"
+    assert opt.name == "Reasoning effort"
+    assert [o.value for o in opt.options] == list(VALID_REASONING_EFFORTS)
+    assert opt.current_value in VALID_REASONING_EFFORTS
+    # Over the wire the option uses ACP camelCase keys.
+    wire = resp.model_dump(by_alias=True, exclude_none=True)
+    assert wire["configOptions"][0]["currentValue"] == opt.current_value
+
+
+@pytest.mark.asyncio
+async def test_set_config_option_reasoning_effort_applies_to_live_agent(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    state = agent.session_manager.get_session(resp.session_id)
+
+    update = await agent.set_config_option("reasoning_effort", resp.session_id, "high")
+
+    assert isinstance(update, SetSessionConfigOptionResponse)
+    assert _effort_option(update.config_options).current_value == "high"
+    assert state.reasoning_effort == "high"
+    assert state.agent.reasoning_config == {"enabled": True, "effort": "high"}
+    # Subsequent session responses report the override.
+    loaded = await agent.load_session(cwd="/tmp", session_id=resp.session_id)
+    assert _effort_option(loaded.config_options).current_value == "high"
+
+
+@pytest.mark.asyncio
+async def test_set_config_option_reasoning_effort_rejects_unknown_value(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    state = agent.session_manager.get_session(resp.session_id)
+    await agent.set_config_option("reasoning_effort", resp.session_id, "low")
+
+    update = await agent.set_config_option("reasoning_effort", resp.session_id, "turbo")
+
+    assert _effort_option(update.config_options).current_value == "low"
+    assert state.reasoning_effort == "low"
+    assert state.agent.reasoning_config == {"enabled": True, "effort": "low"}
+
+
+@pytest.mark.asyncio
+async def test_switch_model_keeps_session_reasoning_effort(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    state = agent.session_manager.get_session(resp.session_id)
+    await agent.set_config_option("reasoning_effort", resp.session_id, "xhigh")
+
+    with patch.object(
+        HermesACPAgent, "_resolve_model_selection", staticmethod(lambda raw, prov: ("openrouter", raw))
+    ):
+        agent._switch_model(state, "some/other-model")
+
+    # _make_agent built a brand-new MagicMock; the ACP override must have been re-applied to it.
+    assert state.agent.reasoning_config == {"enabled": True, "effort": "xhigh"}
+    assert _effort_option(agent._session_config_options(state)).current_value == "xhigh"
 
 
 # ---------------------------------------------------------------------------
@@ -390,7 +462,7 @@ class TestSessionConfiguration:
         )
 
         assert mode_result == {}
-        assert config_result["configOptions"] == []
+        assert [opt["id"] for opt in config_result["configOptions"]] == ["reasoning_effort"]
 
 
 

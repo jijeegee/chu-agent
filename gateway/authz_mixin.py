@@ -481,6 +481,17 @@ class GatewayAuthorizationMixin:
         if source.platform in {Platform.HOMEASSISTANT, Platform.WEBHOOK}:
             return True
 
+        # HQ mode is task-only, before chat grants, allow-all and broad bot admission.
+        if source.platform == Platform.TELEGRAM:
+            adapter = self._adapter_for_source(source)
+            extra = _adapter_config_extra(adapter) if adapter is not None else self._config_extra(source.platform)
+            if "hq_bot_id" in extra and (
+                source.is_bot or source.user_id == str(extra["hq_bot_id"])
+                or getattr(source, "_telegram_hq_verdict", None) is False
+            ):
+                verify = getattr(adapter, "_hq_source_authorized", None)
+                return callable(verify) and verify(source) is True
+
         adapter_profile = self._adapter_profile_for_source(source)
         is_group = source.chat_type in _GROUP_CHAT_TYPES
         is_group_or_forum = source.chat_type in _GROUP_FORUM_TYPES
