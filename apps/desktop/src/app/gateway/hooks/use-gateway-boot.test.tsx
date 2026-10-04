@@ -55,7 +55,7 @@ vi.mock(import('@/store/notifications'), async importOriginal => ({
 }))
 
 // End-to-end-ish repro of the "remote VPS → stuck on CONNECTING, no Settings"
-// bug that drives the REAL useGatewayBoot hook + REAL HermesGateway through a
+// bug that drives the REAL useGatewayBoot hook + REAL ChuGateway through a
 // fake WebSocket we fully control. No Docker / no real port: from the desktop's
 // point of view a "remote VPS" is just a WebSocket that opens once and later
 // refuses to reopen, so that is exactly (and only) what we fake.
@@ -248,11 +248,11 @@ function fakeDesktop() {
 
 function Harness({
   beforeConnectionSwitch = () => undefined,
-  refreshHermesConfig = async () => undefined,
+  refreshChuConfig = async () => undefined,
   refreshSessions
 }: {
   beforeConnectionSwitch?: () => void
-  refreshHermesConfig?: (force?: boolean, shouldPublish?: () => boolean) => Promise<void>
+  refreshChuConfig?: (force?: boolean, shouldPublish?: () => boolean) => Promise<void>
   refreshSessions?: (shouldPublish?: () => boolean) => Promise<void>
 } = {}) {
   useGatewayBoot({
@@ -260,7 +260,7 @@ function Harness({
     handleGatewayEvent: () => undefined,
     onConnectionReady: () => undefined,
     onGatewayReady: () => undefined,
-    refreshHermesConfig,
+    refreshChuConfig,
     refreshSessions: refreshSessions ?? (async () => undefined)
   })
 
@@ -294,7 +294,7 @@ beforeEach(() => {
   powerResume = null
   vi.mocked(notifyError).mockReset()
   ;(globalThis as { WebSocket: unknown }).WebSocket = FakeWebSocket
-  ;(window as { hermesDesktop?: unknown }).hermesDesktop = fakeDesktop()
+  ;(window as { chuDesktop?: unknown }).chuDesktop = fakeDesktop()
   $gatewayState.set('idle')
   $busy.set(false)
   $awaitingResponse.set(false)
@@ -337,8 +337,8 @@ afterEach(() => {
   endGatewaySwitch()
   vi.useRealTimers()
   ;(globalThis as { WebSocket: unknown }).WebSocket = originalWebSocket
-  delete (window as { hermesDesktop?: unknown }).hermesDesktop
-  window.localStorage.removeItem('hermes.desktop.workspace-cwd')
+  delete (window as { chuDesktop?: unknown }).chuDesktop
+  window.localStorage.removeItem('chu.desktop.workspace-cwd')
   $currentCwd.set('')
   $busy.set(false)
   $awaitingResponse.set(false)
@@ -361,9 +361,9 @@ async function advanceBackoff() {
 }
 
 describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => {
-  it('INITIAL boot against a dead VPS: getConnection hangs (waitForHermes) → app sits in the connecting combo, then fails', async () => {
+  it('INITIAL boot against a dead VPS: getConnection hangs (waitForChu) → app sits in the connecting combo, then fails', async () => {
     // The report's actual path: a fresh launch pointed at an unreachable VPS.
-    // startHermes()'s remote branch awaits waitForHermes() for 45s before it
+    // startChu()'s remote branch awaits waitForChu() for 45s before it
     // throws, so the renderer's `await desktop.getConnection()` stays pending
     // that whole window. During it: gatewayState is still 'idle' (connect was
     // never reached) and boot.error is null → connecting=true → the fullscreen
@@ -376,7 +376,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
           rejectConn = reject
         })
     )
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -388,10 +388,10 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     expect($desktopBoot.get().error).toBeNull()
     // ^ connecting === true here → fullscreen CONNECTING, no Settings.
 
-    // After ~45s waitForHermes gives up and getConnection rejects → boot()
+    // After ~45s waitForChu gives up and getConnection rejects → boot()
     // catch → failDesktopBoot → the BootFailureOverlay recovery surface.
     await act(async () => {
-      rejectConn(new Error('Hermes backend did not become ready: timeout'))
+      rejectConn(new Error('Chu backend did not become ready: timeout'))
       await vi.advanceTimersByTimeAsync(0)
     })
 
@@ -413,7 +413,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
   it('a stale failed Settings switch cannot publish failure or disarm the newer switch owner', async () => {
     const desktop = fakeDesktop()
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -473,7 +473,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
 
     let rejectStale: (error: Error) => void = () => undefined
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
     render(<Harness />)
     await flushAsync()
 
@@ -615,7 +615,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       return coderConn.wsUrl
     })
     desktop.connections = { list: vi.fn(async () => registryConnections), setLastUsed }
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     const beforeConnectionSwitch = vi.fn()
     render(<Harness beforeConnectionSwitch={beforeConnectionSwitch} />)
@@ -702,7 +702,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       list: vi.fn(async () => registryConnections),
       setLastUsed: vi.fn(async (id: string) => ({ ok: true, registry: { ...registryConnections, lastUsed: id } }))
     }
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -844,9 +844,9 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       return sanitizeRead === 1 ? staleSanitize.promise : Promise.resolve({ cwd })
     })
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
-    const refreshHermesConfig = async (_force = false, shouldPublish?: () => boolean) => {
+    const refreshChuConfig = async (_force = false, shouldPublish?: () => boolean) => {
       if (!shouldPublish) {
         return
       }
@@ -863,7 +863,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       }
     }
 
-    render(<Harness refreshHermesConfig={refreshHermesConfig} />)
+    render(<Harness refreshChuConfig={refreshChuConfig} />)
     await flushAsync()
     expect($gatewayState.get()).toBe('open')
 
@@ -915,7 +915,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       profile,
       wsUrl: `wss://${connectionId}.example.com/api/ws?token=r`
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -970,7 +970,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
 
       throw new Error(`unexpected api call: ${path}`)
     })
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1083,7 +1083,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       // drop hangs indefinitely.
       return callCount === 1 ? originalGetConnection(profile) : new Promise(() => undefined)
     })
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1122,7 +1122,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       // itself stays fast so this isolates the revalidate call specifically.
       return new Promise(() => undefined)
     })
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1167,7 +1167,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       connectionId,
       profile
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1211,13 +1211,13 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
 
   it('a getConnection() that hangs on INITIAL boot rejects on its own after the reconnect-attempt timeout, not only when main eventually gives up (#93454)', async () => {
     // boot()'s getConnection() had no bound of its own — only main's own
-    // eventual timeout (e.g. waitForHermes, ~45s) ever settled it. A wedge
+    // eventual timeout (e.g. waitForChu, ~45s) ever settled it. A wedge
     // that main never resolves (not even a rejection) must not hang
-    // "Starting Hermes…" forever; the renderer needs to own its own bound
+    // "Starting Chu…" forever; the renderer needs to own its own bound
     // here too, same as attemptReconnect() and softSwitch().
     const desktop = fakeDesktop()
     desktop.getConnection = vi.fn(() => new Promise(() => undefined))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1250,7 +1250,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       // Initial boot succeeds; the switch triggered below hangs indefinitely.
       return callCount === 1 ? originalGetConnection(profile) : new Promise(() => undefined)
     })
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1334,7 +1334,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       getGatewayWsUrlFor: vi.fn(async () => coderConn.wsUrl)
     }
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1393,7 +1393,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
   })
 
   it('manual reconnect replaces only the active secondary route', async () => {
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = {
+    ;(window as { chuDesktop?: unknown }).chuDesktop = {
       ...fakeDesktop(),
       getConnectionFor: vi.fn(async () => coderConn),
       getGatewayWsUrlFor: vi.fn(async () => coderConn.wsUrl)
@@ -1418,7 +1418,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
   it('power resume force-redials a half-open primary socket that still reports OPEN', async () => {
     const desktop = fakeDesktop()
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1454,7 +1454,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       emitBootProgress: (payload: Record<string, unknown>) => void
     }
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1465,7 +1465,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     // That used to promote into BootFailureOverlay and lock reading/drafting.
     act(() => {
       desktop.emitBootProgress({
-        error: 'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket. Try reconnecting.',
+        error: 'Could not reach the remote Chu gateway while refreshing its WebSocket ticket. Try reconnecting.',
         message: 'Desktop boot failed',
         phase: 'backend.error',
         progress: 94,
@@ -1482,7 +1482,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     // The version-skew report: gateway WS connects fine, but refreshSessions()
     // rejects (e.g. older backend 404s an endpoint the fallback didn't cover,
     // or a transient read error). That must NOT reject boot() into
-    // failDesktopBoot's "Hermes couldn't start" overlay — the socket is open
+    // failDesktopBoot's "Chu couldn't start" overlay — the socket is open
     // and the app is fully usable with an empty sidebar.
     const refreshSessions = vi.fn(async () => {
       throw new Error('404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}')
@@ -1512,14 +1512,14 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.settings = {
       getDefaultProjectDir: vi.fn(async () => ({
         defaultLabel: 'C:\\Users\\sonny',
-        dir: 'C:\\Hermes',
-        resolvedCwd: 'C:\\Hermes'
+        dir: 'C:\\Chu',
+        resolvedCwd: 'C:\\Chu'
       })),
       pickDefaultProjectDir: vi.fn(async () => undefined),
       setDefaultProjectDir: vi.fn(async () => undefined)
     }
     desktop.sanitizeWorkspaceCwd = vi.fn(async (cwd: string) => ({ cwd }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     // Record the cwd at the exact moment the gateway opens its WebSocket: if
     // the seed moved back post-connect, this would still be '' here and the
@@ -1539,14 +1539,14 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     render(<Harness />)
     await flushAsync()
 
-    expect(cwdAtConnect).toBe('C:\\Hermes')
-    expect($currentCwd.get()).toBe('C:\\Hermes')
+    expect(cwdAtConnect).toBe('C:\\Chu')
+    expect($currentCwd.get()).toBe('C:\\Chu')
   })
 
   it('FIX: primary sleep/wake reconnect dials the window backend, not the active secondary profile', async () => {
     const desktop = fakeDesktop()
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1588,7 +1588,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
 
   it('FIX #82679: a transient remote boot failure self-heals — the next attempt rebuilds the dropped connection', async () => {
     // The reported class: the app relaunches (or wakes) against a registered
-    // SSH/HTTP remote whose transport dropped. startHermes() rejects with a
+    // SSH/HTTP remote whose transport dropped. startChu() rejects with a
     // transient transport error ("Could not verify the existing SSH backend"),
     // main tags the boot progress `retryable`, and — before the fix — the app
     // parked on "Desktop boot failed" until the user re-entered the exact same
@@ -1609,7 +1609,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       running: false,
       timestamp: Date.now()
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1637,14 +1637,14 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Chu is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,
       running: true,
       timestamp: 1
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
     FakeWebSocket.mode = 'fail'
 
     render(<Harness />)
@@ -1672,14 +1672,14 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Chu is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,
       running: true,
       timestamp: 1
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
     FakeWebSocket.mode = 'fail'
 
     render(<Harness />)
@@ -1697,24 +1697,24 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Chu is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,
       running: true,
       timestamp: 1
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
-    const refreshHermesConfig = vi.fn(async () => {
+    const refreshChuConfig = vi.fn(async () => {
       FakeWebSocket.instances[0]?.drop()
       throw new Error('post-connect initialization failed')
     })
 
-    render(<Harness refreshHermesConfig={refreshHermesConfig} />)
+    render(<Harness refreshChuConfig={refreshChuConfig} />)
     await flushAsync()
 
-    expect(refreshHermesConfig).toHaveBeenCalledTimes(1)
+    expect(refreshChuConfig).toHaveBeenCalledTimes(1)
     expect($desktopBoot.get().error).toBeTruthy()
     expect(desktop.getConnection).toHaveBeenCalledTimes(1)
     await advanceBackoff()
@@ -1736,7 +1736,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       running: false,
       timestamp: Date.now()
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()
@@ -1771,7 +1771,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
       running: false,
       timestamp: Date.now()
     }))
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = desktop
+    ;(window as { chuDesktop?: unknown }).chuDesktop = desktop
 
     render(<Harness />)
     await flushAsync()

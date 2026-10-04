@@ -7,7 +7,7 @@ chat_completions reasoning translations (GLM-5.2, Kimi K2, DeepSeek, Ox Alpha).
 from typing import Any
 
 from agent import reasoning_effort as re_
-from hermes_cli import __version__ as _HERMES_VERSION
+from chu_cli import __version__ as _CHU_VERSION
 from providers import register_provider
 from providers.base import ProviderProfile
 
@@ -15,8 +15,8 @@ from providers.base import ProviderProfile
 # default_headers so they survive model switches and credential rotation.
 _ATTRIBUTION_HEADERS = {
     "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-    "X-Title": "Hermes Agent",
-    "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
+    "X-Title": "Chu Agent",
+    "User-Agent": f"ChuAgent/{_CHU_VERSION}",
 }
 
 

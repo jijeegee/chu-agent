@@ -19,7 +19,7 @@ def stage2_text() -> str:
     return STAGE2_HOOK.read_text()
 
 
-def _chown_hermes_tree_function(text: str) -> str:
+def _chown_chu_tree_function(text: str) -> str:
     start = text.index("path_has_symlink_component() {")
     end = text.index("\n\nneeds_chown=false", start)
     return text[start:end]
@@ -30,18 +30,18 @@ def _run_helper(
     target: Path,
     log_path: Path,
     *,
-    hermes_home: Path | None = None,
+    chu_home: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     shell = shutil.which("sh")
     if shell is None:
         pytest.skip("sh not available")
-    hermes_home = target if hermes_home is None else hermes_home
+    chu_home = target if chu_home is None else chu_home
     script = (
         "set -eu\n"
-        f'HERMES_HOME="{hermes_home}"\n'
-        f"{_chown_hermes_tree_function(text)}\n"
+        f'CHU_HOME="{chu_home}"\n'
+        f"{_chown_chu_tree_function(text)}\n"
         f'chown() {{ printf "%s\\n" "$*" >> "{log_path}"; }}\n'
-        f'chown_hermes_tree "{target}"\n'
+        f'chown_chu_tree "{target}"\n'
     )
     return subprocess.run([shell, "-c", script], capture_output=True, text=True)
 
@@ -55,14 +55,14 @@ def test_chown_helper_repairs_real_directories(stage2_text: str, tmp_path: Path)
 
     assert proc.returncode == 0, proc.stderr
     assert log_path.read_text().splitlines() == [
-        f"-R hermes:hermes {target}",
+        f"-R chu:chu {target}",
     ]
 
 
 def test_chown_helper_refuses_symlinked_directories(stage2_text: str, tmp_path: Path) -> None:
     real_home = tmp_path / "real-home"
     real_home.mkdir()
-    symlinked_home = tmp_path / "hermes-home"
+    symlinked_home = tmp_path / "chu-home"
     try:
         symlinked_home.symlink_to(real_home, target_is_directory=True)
     except (NotImplementedError, OSError):
@@ -93,36 +93,36 @@ def test_chown_helper_refuses_target_under_symlinked_home(
         stage2_text,
         linked_home / "cron",
         log_path,
-        hermes_home=linked_home,
+        chu_home=linked_home,
     )
 
     assert proc.returncode == 0, proc.stderr
-    assert not log_path.exists(), "must not chown through a symlinked HERMES_HOME"
+    assert not log_path.exists(), "must not chown through a symlinked CHU_HOME"
     assert "refusing recursive chown through symlinked path" in proc.stdout
 
 
-def test_stage2_uses_symlink_safe_helper_for_hermes_home_trees(stage2_text: str) -> None:
-    assert 'chown_hermes_tree "$HERMES_HOME/$sub"' in stage2_text
-    assert 'chown_hermes_tree "$HERMES_HOME/profiles"' in stage2_text
-    assert 'chown_hermes_tree "$HERMES_HOME/cron"' in stage2_text
-    assert 'chown -R hermes:hermes "$HERMES_HOME/$sub"' not in stage2_text
-    assert 'chown -R hermes:hermes "$HERMES_HOME/profiles"' not in stage2_text
-    assert 'chown -R hermes:hermes "$HERMES_HOME/cron"' not in stage2_text
+def test_stage2_uses_symlink_safe_helper_for_chu_home_trees(stage2_text: str) -> None:
+    assert 'chown_chu_tree "$CHU_HOME/$sub"' in stage2_text
+    assert 'chown_chu_tree "$CHU_HOME/profiles"' in stage2_text
+    assert 'chown_chu_tree "$CHU_HOME/cron"' in stage2_text
+    assert 'chown -R chu:chu "$CHU_HOME/$sub"' not in stage2_text
+    assert 'chown -R chu:chu "$CHU_HOME/profiles"' not in stage2_text
+    assert 'chown -R chu:chu "$CHU_HOME/cron"' not in stage2_text
 
 
-def test_stage2_skips_top_level_chown_for_symlinked_hermes_home(
+def test_stage2_skips_top_level_chown_for_symlinked_chu_home(
     stage2_text: str,
 ) -> None:
-    assert 'refuse_symlinked_path "chown" "$HERMES_HOME"' in stage2_text
+    assert 'refuse_symlinked_path "chown" "$CHU_HOME"' in stage2_text
 
 
 def test_stage2_skips_recursive_repairs_when_tree_is_already_owned(
     stage2_text: str,
 ) -> None:
-    assert "tree_has_non_hermes_owner() {" in stage2_text
-    assert 'if [ -e "$HERMES_HOME/$sub" ] && tree_has_non_hermes_owner "$HERMES_HOME/$sub"; then' in stage2_text
-    assert 'if [ -d "$HERMES_HOME/profiles" ] && tree_has_non_hermes_owner "$HERMES_HOME/profiles"; then' in stage2_text
+    assert "tree_has_non_chu_owner() {" in stage2_text
+    assert 'if [ -e "$CHU_HOME/$sub" ] && tree_has_non_chu_owner "$CHU_HOME/$sub"; then' in stage2_text
+    assert 'if [ -d "$CHU_HOME/profiles" ] && tree_has_non_chu_owner "$CHU_HOME/profiles"; then' in stage2_text
     # Sibling every-boot chown blocks carry the same warm-boot gate.
-    assert 'if [ -d "$HERMES_HOME/cron" ] && tree_has_non_hermes_owner "$HERMES_HOME/cron"; then' in stage2_text
-    assert 'if [ -d "$HERMES_HOME/platforms/pairing" ] && tree_has_non_hermes_owner "$HERMES_HOME/platforms/pairing"; then' in stage2_text
-    assert 'if [ -d "$HERMES_HOME/pairing" ] && tree_has_non_hermes_owner "$HERMES_HOME/pairing"; then' in stage2_text
+    assert 'if [ -d "$CHU_HOME/cron" ] && tree_has_non_chu_owner "$CHU_HOME/cron"; then' in stage2_text
+    assert 'if [ -d "$CHU_HOME/platforms/pairing" ] && tree_has_non_chu_owner "$CHU_HOME/platforms/pairing"; then' in stage2_text
+    assert 'if [ -d "$CHU_HOME/pairing" ] && tree_has_non_chu_owner "$CHU_HOME/pairing"; then' in stage2_text

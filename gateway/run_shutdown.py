@@ -63,10 +63,10 @@ def _resolve_gateway_exit_verdict(runner, signal_initiated_shutdown: bool) -> bo
     return True
 
 # Windows has no bash/setsid chain: a tiny detached Python watcher waits for the gateway PID to
-# exit (bounded), then spawns ``hermes gateway restart``.
+# exit (bounded), then spawns ``chu gateway restart``.
 _WINDOWS_RESTART_WATCHER = """
 import os, subprocess, sys, time
-from hermes_cli._subprocess_compat import windows_detach_flags_without_breakaway
+from chu_cli._subprocess_compat import windows_detach_flags_without_breakaway
 pid = int(sys.argv[1])
 restart_after_s = float(sys.argv[2])
 cmd = sys.argv[3:]
@@ -269,11 +269,11 @@ class GatewayShutdownMixin:
     def _scale_to_zero_has_live_background_work(self) -> bool:
         """Live background work (delegations, processes, pending watchers) that must block a suspend.
 
-        PERMANENT supervised watchers (_hermes_supervised_watcher, incl. the scale-to-zero watcher
+        PERMANENT supervised watchers (_chu_supervised_watcher, incl. the scale-to-zero watcher
         itself) are excluded, else this would be True forever and the gateway could never go dormant.
         """
         if any(
-            not t.done() and not getattr(t, "_hermes_supervised_watcher", False)
+            not t.done() and not getattr(t, "_chu_supervised_watcher", False)
             for t in self._background_tasks
         ):
             return True
@@ -690,7 +690,7 @@ class GatewayShutdownMixin:
         )
         logger.warning(
             "%s paused after %d consecutive failures (%s) — fix the underlying issue then run `/platform "
-            "resume %s` to retry, or `hermes gateway restart` to restart the gateway.",
+            "resume %s` to retry, or `chu gateway restart` to restart the gateway.",
             platform.value, info.get("attempts", 0), info["pause_reason"], platform.value,
         )
 
@@ -1099,10 +1099,10 @@ class GatewayShutdownMixin:
         self._track_task_in(tasks, asyncio.create_task(_cleanup_when_done()))
 
     async def _finalize_session_off_loop(self, *, session_id: Any, platform: str, reason: str, **extra: Any) -> None:
-        """Run hermes_cli.lifecycle.finalize_session off-loop, bounded; on timeout the worker is left alone."""
+        """Run chu_cli.lifecycle.finalize_session off-loop, bounded; on timeout the worker is left alone."""
 
         def _call() -> None:
-            from hermes_cli.lifecycle import finalize_session
+            from chu_cli.lifecycle import finalize_session
             finalize_session(session_id=session_id, platform=platform, reason=reason, **extra)
 
         try:
@@ -1180,8 +1180,8 @@ class GatewayShutdownMixin:
 
     # Stuck-loop (restart failure) counters
     def _stuck_loop_counts_path(self) -> Path:
-        from gateway.run import _hermes_home
-        return _hermes_home / self._STUCK_LOOP_FILE
+        from gateway.run import _chu_home
+        return _chu_home / self._STUCK_LOOP_FILE
 
     @staticmethod
     def _read_json_counts(path: Path) -> Optional[dict]:
@@ -1248,17 +1248,17 @@ class GatewayShutdownMixin:
     # Restart orchestration
     @staticmethod
     def _restart_watcher_env() -> dict:
-        """Watcher env minus ``_HERMES_GATEWAY`` (else the CLI's self-restart guard refuses; gateway stays down)."""
+        """Watcher env minus ``_CHU_GATEWAY`` (else the CLI's self-restart guard refuses; gateway stays down)."""
         from tools.environments.local import build_subprocess_env
         watcher_env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=True)
-        watcher_env.pop("_HERMES_GATEWAY", None)
+        watcher_env.pop("_CHU_GATEWAY", None)
         return watcher_env
 
     @staticmethod
-    def _spawn_windows_restart_watcher(hermes_cmd: list, current_pid: int, restart_after_s: float) -> None:
+    def _spawn_windows_restart_watcher(chu_cmd: list, current_pid: int, restart_after_s: float) -> None:
         """Spawn the detached Windows watcher (``python -c``), retrying once without job breakaway."""
         import subprocess
-        from hermes_cli._subprocess_compat import (
+        from chu_cli._subprocess_compat import (
             windows_detach_flags_without_breakaway, windows_detach_popen_kwargs
         )
         watcher_env = GatewayShutdownMixin._restart_watcher_env()
@@ -1266,7 +1266,7 @@ class GatewayShutdownMixin:
         # Console python under CREATE_NO_WINDOW: nothing flashes. NOT pythonw.exe — a console-less
         # watcher makes every console-subsystem descendant allocate a visible conhost (#54220/#56747).
         # The watcher runs sys.executable (console python) under the CREATE_NO_WINDOW detach kwargs below:
-        # it owns one hidden console, inherited by the `hermes gateway restart` child, so nothing flashes.
+        # it owns one hidden console, inherited by the `chu gateway restart` child, so nothing flashes.
         # See #54220, #56747.
         watcher_python = sys.executable
         venv_dir = Path(watcher_env.get("VIRTUAL_ENV") or project_root / "venv")
@@ -1279,7 +1279,7 @@ class GatewayShutdownMixin:
             watcher_env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(pythonpath))
         watcher_argv = [
             watcher_python, "-c", _WINDOWS_RESTART_WATCHER,
-            str(current_pid), str(restart_after_s), *hermes_cmd, "gateway", "restart",
+            str(current_pid), str(restart_after_s), *chu_cmd, "gateway", "restart",
         ]
         popen_kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=watcher_env)
         # Break away from the parent CLI's job object or be reaped when the CLI exits; a job without
@@ -1304,12 +1304,12 @@ class GatewayShutdownMixin:
                 )
 
     async def _launch_detached_restart_command(self) -> None:
-        from gateway.run import _resolve_hermes_bin
+        from gateway.run import _resolve_chu_bin
         import shutil
         import subprocess
-        hermes_cmd = _resolve_hermes_bin()
-        if not hermes_cmd:
-            logger.error("Could not locate hermes binary for detached /restart")
+        chu_cmd = _resolve_chu_bin()
+        if not chu_cmd:
+            logger.error("Could not locate chu binary for detached /restart")
             return
         if self._detached_restart_helper_started:
             return
@@ -1317,9 +1317,9 @@ class GatewayShutdownMixin:
         current_pid = os.getpid()
         restart_after_s = max(float(getattr(self, "_restart_drain_timeout", 0.0) or 0.0) + 5.0, 5.0)
         if sys.platform == "win32":
-            GatewayShutdownMixin._spawn_windows_restart_watcher(hermes_cmd, current_pid, restart_after_s)
+            GatewayShutdownMixin._spawn_windows_restart_watcher(chu_cmd, current_pid, restart_after_s)
             return
-        cmd = " ".join(shlex.quote(part) for part in hermes_cmd)
+        cmd = " ".join(shlex.quote(part) for part in chu_cmd)
         shell_cmd = (
             f"deadline=$(( $(date +%s) + {int(restart_after_s)} )); "
             f"while kill -0 {current_pid} 2>/dev/null && [ $(date +%s) -lt $deadline ]; do sleep 0.2; done; "
@@ -1339,7 +1339,7 @@ class GatewayShutdownMixin:
         an unreadable activity summary means "not wedged".
         """
         from gateway.run import _AGENT_PENDING_SENTINEL, _float_env
-        timeout = _float_env("HERMES_AGENT_TIMEOUT", 1800)
+        timeout = _float_env("CHU_AGENT_TIMEOUT", 1800)
         if timeout <= 0:
             return 0
 
@@ -1464,7 +1464,7 @@ class GatewayShutdownMixin:
         if not watchdog.start():
             return False
         self._systemd_watchdog = watchdog
-        watchdog.ready("Hermes Gateway running")
+        watchdog.ready("Chu Gateway running")
         return True
 
     async def _stop_systemd_watchdog(self) -> None:
@@ -1793,7 +1793,7 @@ class GatewayShutdownMixin:
             # Shared SessionDB instances still held by the process-wide registry (tools, cron, mirror).
             # This is the safety net that guarantees no WAL write lock survives past gateway shutdown
             # (#90837).
-            from hermes_state_registry import close_all
+            from chu_state_registry import close_all
             closed = close_all()
             if closed:
                 logger.debug("Closed %d shared SessionDB instance(s) at shutdown", closed)
@@ -1803,7 +1803,7 @@ class GatewayShutdownMixin:
 
     def _stop_persist_exit_state(self, ctx: "GatewayShutdownMixin._StopContext") -> None:
         """PID/lock release, clean-shutdown marker, restart markers, terminal runtime status."""
-        from gateway.run import _hermes_home, _planned_restart_notification_path, _shutdown_gateway_health_export
+        from gateway.run import _chu_home, _planned_restart_notification_path, _shutdown_gateway_health_export
         from utils import atomic_json_write
         from gateway.status import remove_pid_file, release_gateway_runtime_lock
         remove_pid_file()
@@ -1812,7 +1812,7 @@ class GatewayShutdownMixin:
         # half-finished sessions, so no marker — the next startup suspends them.
         if not ctx.timed_out:
             with suppress(Exception):
-                (_hermes_home / ".clean_shutdown").touch()
+                (_chu_home / ".clean_shutdown").touch()
         else:
             logger.info(
                 "Skipping .clean_shutdown marker — drain timed out with "

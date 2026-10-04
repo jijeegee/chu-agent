@@ -26,8 +26,8 @@ def _get_mcp_stderr_log() -> Any:
     with _mcp_stderr_log_lock:
         if _mcp_stderr_log_fh is None:
             try:
-                from hermes_constants import get_hermes_home
-                log_dir = get_hermes_home() / "logs"
+                from chu_constants import get_chu_home
+                log_dir = get_chu_home() / "logs"
                 log_dir.mkdir(parents=True, exist_ok=True)
                 # Line-buffered so output lands promptly; errors="replace" tolerates garbled binary.
                 fh = open(log_dir / "mcp-stderr.log", "a", encoding="utf-8", errors="replace", buffering=1)
@@ -96,14 +96,14 @@ def _build_safe_env(user_env: Optional[dict]) -> dict:
     keys, ``XDG_*``, vars injected by an external secret source (users configured that backend
     precisely so subprocesses can consume them), plus the server config's own ``env``."""
     try:
-        from hermes_cli.env_loader import get_secret_source
+        from chu_cli.env_loader import get_secret_source
     except Exception:  # pragma: no cover — early bootstrap/import fallback
         get_secret_source = None
     env = {
         key: value for key, value in os.environ.items()
         if key in _SAFE_ENV_KEYS or key.upper() in _SAFE_ENV_KEYS_CASE_INSENSITIVE
         or key.startswith("XDG_") or (get_secret_source is not None and get_secret_source(key))}
-    for key in ("HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD"):
+    for key in ("CHU_KANBAN_DB", "CHU_KANBAN_BOARD"):
         if key in os.environ:
             env[key] = os.environ[key]
     if user_env:
@@ -131,10 +131,10 @@ def _which_with_config_pathext(command: str, path_arg, env: dict):
 def _node_fallback(command: str) -> str:
     """Well-known Node install locations for bare ``npx``/``npm``/``node``; *command* unchanged when none exists."""
     home = os.path.expanduser("~")
-    hermes_home = os.path.expanduser(os.getenv("HERMES_HOME", os.path.join(home, ".hermes")))
-    # /usr/local/bin: canonical Node location (from-source Linux, Hermes Docker image, Intel Homebrew),
+    chu_home = os.path.expanduser(os.getenv("CHU_HOME", os.path.join(home, ".chu")))
+    # /usr/local/bin: canonical Node location (from-source Linux, Chu Docker image, Intel Homebrew),
     # needed when a hand-authored env.PATH omits it — npx's shebang re-execs /usr/bin/env node.
-    candidates = (os.path.join(hermes_home, "node", "bin", command), os.path.join(home, ".local", "bin", command),
+    candidates = (os.path.join(chu_home, "node", "bin", command), os.path.join(home, ".local", "bin", command),
                   os.path.join(os.sep, "usr", "local", "bin", command))
     return next((c for c in candidates if os.path.isfile(c) and os.access(c, os.X_OK)), command)
 
@@ -162,7 +162,7 @@ def _npx_bin_candidates(bin_dir: str, name: str, *, windows: Optional[bool] = No
     """Launcher paths to try for *name* inside an npx cache's ``.bin``, in order. On Windows that
     directory holds the extensionless sh script plus ``<name>.cmd``/``<name>.ps1``; the sh one
     cannot be spawned there and ``os.access(X_OK)`` is only an existence check, so select by
-    extension (same precedence as ``hermes_constants._candidate_node_command_names``). ``windows``
+    extension (same precedence as ``chu_constants._candidate_node_command_names``). ``windows``
     is injectable so the branch is testable without patching ``os.name`` process-wide."""
     is_windows = os.name == "nt" if windows is None else windows
     if is_windows:
@@ -174,7 +174,7 @@ def _npx_cached_bin(args: list) -> Optional[tuple]:
     """Resolve ``npx -y <pkg>`` to the already-installed binary, or None.
 
     ``npx`` resolves the package and then FORKS, staying resident as the real server's parent
-    for nothing (~48 MB private memory per MCP server, measured); Hermes already supervises the
+    for nothing (~48 MB private memory per MCP server, measured); Chu already supervises the
     child (shared death supervisor). When the package is in npx's cache we spawn its binary
     directly. Deliberately conservative — None (caller keeps plain ``npx``, so a cold machine
     still installs) for a cache miss, a version pin (``pkg@1.2.3``), extra npx flags, a manifest
@@ -285,7 +285,7 @@ def _warn_hidden_whitespace(server_name: str, config: dict) -> List[str]:
 def _filter_suspicious_mcp_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
     """Drop exfiltration-shaped MCP configs before any stdio spawn path."""
     try:
-        from hermes_cli.mcp_security import validate_mcp_server_entry
+        from chu_cli.mcp_security import validate_mcp_server_entry
     except Exception:
         return servers
     safe_servers = {}
@@ -301,7 +301,7 @@ def _filter_suspicious_mcp_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
 def _portable_mcp_servers(safe_servers: Dict[str, dict]) -> None:
     """Merge plugin-provided (portable) MCP servers into *safe_servers*; native config wins on a clash. Never raises."""
     try:
-        from hermes_cli.plugins import discover_plugins, get_plugin_manager
+        from chu_cli.plugins import discover_plugins, get_plugin_manager
         discover_plugins()
         portable = get_plugin_manager().get_portable_mcp_servers()
         for name, cfg in _filter_suspicious_mcp_servers(portable).items():
@@ -316,14 +316,14 @@ def _portable_mcp_servers(safe_servers: Dict[str, dict]) -> None:
 def _load_mcp_config() -> Dict[str, dict]:
     """``mcp_servers`` from config.yaml as ``{name: config}`` (empty on error / safe mode), ``${VAR}`` interpolated."""
     try:
-        from hermes_cli.config import load_config
+        from chu_cli.config import load_config
         from utils import env_var_enabled as _env_enabled
-        if _env_enabled("HERMES_SAFE_MODE"):
+        if _env_enabled("CHU_SAFE_MODE"):
             return {}
         servers = load_config().get("mcp_servers")
         try:  # ensure .env vars are available for interpolation
-            from hermes_cli.env_loader import load_hermes_dotenv
-            load_hermes_dotenv()
+            from chu_cli.env_loader import load_chu_dotenv
+            load_chu_dotenv()
         except Exception:
             pass
         safe_servers: Dict[str, dict] = {}

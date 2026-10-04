@@ -167,7 +167,7 @@ test('buildNativeAuthorizeUrl omits provider when not given and preserves prefix
 
   const parsed = new URL(url)
 
-  assert.equal(parsed.pathname, '/hermes/auth/native/authorize')
+  assert.equal(parsed.pathname, '/chu/auth/native/authorize')
   assert.equal(parsed.searchParams.get('provider'), null)
 })
 

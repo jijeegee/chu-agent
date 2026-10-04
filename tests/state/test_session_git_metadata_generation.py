@@ -5,8 +5,8 @@ from __future__ import annotations
 import sqlite3
 import threading
 
-from hermes_state import SessionDB
-from hermes_state_common import SCHEMA_VERSION
+from chu_state import SessionDB
+from chu_state_common import SCHEMA_VERSION
 
 
 def _open_pair(tmp_path):

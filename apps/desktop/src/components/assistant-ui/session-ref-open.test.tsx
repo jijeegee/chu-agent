@@ -13,13 +13,13 @@ vi.mock('@/app/open-session', () => ({
   openSession: (...args: unknown[]) => openSession(...args)
 }))
 
-const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
+const desktopWindow = window as unknown as { chuDesktop?: Window['chuDesktop'] }
 
 afterEach(() => {
   cleanup()
   closeRightRail()
   openSession.mockClear()
-  delete desktopWindow.hermesDesktop
+  delete desktopWindow.chuDesktop
   __resetSessionLinkTitleCache()
 })
 
@@ -54,7 +54,7 @@ describe('url refs open in the browser pane', () => {
   it('opens a url chip in the user transcript', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
 
-    desktopWindow.hermesDesktop = { openExternal } as unknown as Window['hermesDesktop']
+    desktopWindow.chuDesktop = { openExternal } as unknown as Window['chuDesktop']
 
     render(<DirectiveContent text="see @url:`https://example.com/docs` when you can" />)
 

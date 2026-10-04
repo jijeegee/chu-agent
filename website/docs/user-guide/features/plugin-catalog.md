@@ -2,16 +2,16 @@
 sidebar_position: 13
 sidebar_label: "Plugin Catalog"
 title: "Plugin Catalog"
-description: "Browse and install reviewed, SHA-pinned Hermes plugins from the curated catalog"
+description: "Browse and install reviewed, SHA-pinned Chu plugins from the curated catalog"
 ---
 
 # Plugin Catalog
 
-The plugin catalog is a curated, human-reviewed directory of Hermes plugins you
+The plugin catalog is a curated, human-reviewed directory of Chu plugins you
 can install by name with a single command:
 
 ```bash
-hermes plugins install <name>
+chu plugins install <name>
 ```
 
 Browse it visually at **[/docs/plugins](/plugins)** — search, tier filters
@@ -27,17 +27,17 @@ layer on top.
 
 Each catalog entry is a small YAML file in the
 [`plugin-catalog/`](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog)
-directory of the hermes-agent repository, declaring:
+directory of the chu-agent repository, declaring:
 
 | Field | Meaning |
 |---|---|
-| `name` | The catalog key you pass to `hermes plugins install` |
+| `name` | The catalog key you pass to `chu plugins install` |
 | `repo` | The plugin's public git repository |
 | `sha` | The **exact 40-hex commit** that was reviewed — installs check out this pin, not a branch tip |
 | `tier` | `official` (maintained by NousResearch) or `community` |
 | `maintainer` | Who owns the plugin |
 | `capabilities` | Declared tools, hooks, middleware, and required env vars |
-| `requires_hermes` | Minimum Hermes version, e.g. `>=0.19` (optional) |
+| `requires_chu` | Minimum Chu version, e.g. `>=0.19` (optional) |
 | `platforms` | OS restrictions, empty = all (optional) |
 | `docs_url` | External documentation link (optional) |
 
@@ -72,10 +72,10 @@ repository. Review the code of anything you give credentials to.
 
 ```bash
 # Install a reviewed catalog entry by name (checks out the pinned SHA)
-hermes plugins install <name>
+chu plugins install <name>
 
 # Then enable it, as with any plugin
-hermes plugins enable <name>
+chu plugins enable <name>
 ```
 
 The install prompt shows the entry's capability summary — declared tools,
@@ -83,10 +83,10 @@ hooks, and required env vars — before anything is cloned.
 
 ### Updating a catalog install
 
-`hermes plugins update <name>` never runs `git pull` for catalog installs —
+`chu plugins update <name>` never runs `git pull` for catalog installs —
 it compares your installed pin against the current catalog pin and, when the
 catalog moved (via a reviewed PR), force-reinstalls at the new SHA. Your
-enabled/disabled state is preserved. `hermes plugins list` shows catalog
+enabled/disabled state is preserved. `chu plugins list` shows catalog
 installs as `catalog:<tier>@<sha>` so you can see provenance at a glance.
 
 ### Names not in the catalog
@@ -100,13 +100,13 @@ unreviewed name index. Install such plugins by `owner/repo` or Git URL instead
 The docs build publishes the catalog as one JSON document
 (`https://hermes-agent.nousresearch.com/docs/api/plugin-catalog.json`).
 `search`/`install`/`update` fetch it at most every six hours and cache it under
-`~/.hermes/cache/`, so new entries and removals reach installed clients without
-updating Hermes. Offline, the copy shipped with your checkout is used. Removals
+`~/.chu/cache/`, so new entries and removals reach installed clients without
+updating Chu. Offline, the copy shipped with your checkout is used. Removals
 from the in-tree list and the live list are always both enforced.
 
 ### Custom git URLs are different
 
-`hermes plugins install <git-url>` still works for any repository, but it
+`chu plugins install <git-url>` still works for any repository, but it
 bypasses the catalog entirely:
 
 - **No review** — you get whatever is at the branch tip, not a reviewed pin.
@@ -138,6 +138,6 @@ process.
 
 - [Plugins](plugins.md) — the plugin system itself: manifest format, enabling,
   configuration
-- [Built-in Plugins](built-in-plugins.md) — plugins that ship with Hermes
-- [Build a Hermes Plugin](/developer-guide/plugins) — write your own
+- [Built-in Plugins](built-in-plugins.md) — plugins that ship with Chu
+- [Build a Chu Plugin](/developer-guide/plugins) — write your own
 - [Plugin Catalog page](/plugins) — the browsable catalog

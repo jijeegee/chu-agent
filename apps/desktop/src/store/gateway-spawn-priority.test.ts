@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // spawn as a background slot wait and the click waits out the probe's 20s
 // timeout before anything promotes it.
 
-vi.mock('@/hermes', () => ({
+vi.mock('@/chu', () => ({
   setApiRequestConnection: vi.fn(),
-  HermesGateway: class {
+  ChuGateway: class {
     connectionState = 'closed'
     connect = async (): Promise<void> => {
       this.connectionState = 'open'
@@ -49,7 +49,7 @@ function installDesktop(): { getConnection: ReturnType<typeof vi.fn>; getConnect
     getConnectionFor: vi.fn(async () => conn)
   }
 
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
+  ;(window as unknown as { chuDesktop: unknown }).chuDesktop = stub
 
   return stub
 }
@@ -66,7 +66,7 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { chuDesktop?: unknown }).chuDesktop
 })
 
 describe('user opens dial main as foreground from the first IPC (#102281)', () => {

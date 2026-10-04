@@ -5,7 +5,7 @@ import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
-import type { ProfileScope } from '@/hermes'
+import type { ProfileScope } from '@/chu'
 import { useI18n } from '@/i18n'
 import { Loader2, Package } from '@/lib/icons'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,7 @@ import { PanelEmpty } from '../overlays/panel'
 // The REAL Plugin Catalog page (docs site) embedded as a one-click picker —
 // the same pattern as the Skills tab's EmbeddedHubPicker. `?embed=picker`
 // hides the docs chrome and adds "+ Add to this Agent" per card, which posts
-//   { type: 'hermes-plugin-pick', name, repo, sha, subdir, tier, installCmd }
+//   { type: 'chu-plugin-pick', name, repo, sha, subdir, tier, installCmd }
 // to the parent window. We validate the origin and open the shared
 // dual-target install modal (agent half → catalog-pinned install into the
 // scoped profile; desktop half → local app), so bundled agent+desktop
@@ -173,7 +173,7 @@ export const PluginsTab = memo(function PluginsTab({ profile }: { profile: Profi
 
       const data = event.data as null | PluginPickMessage
 
-      if (!data || data.type !== 'hermes-plugin-pick' || !data.name || !data.repo) {
+      if (!data || data.type !== 'chu-plugin-pick' || !data.name || !data.repo) {
         return
       }
 

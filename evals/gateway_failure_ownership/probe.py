@@ -12,8 +12,8 @@ os.environ.clear()
 os.environ.update(keep)
 os.environ.update(
     HOME=str(HOME),
-    HERMES_HOME=str(HOME),
-    HERMES_DISABLE_PLUGINS="1",
+    CHU_HOME=str(HOME),
+    CHU_DISABLE_PLUGINS="1",
     NO_PROXY="127.0.0.1,localhost",
 )
 sys.path.insert(0, str(ROOT))
@@ -123,7 +123,7 @@ class Peer(BaseHTTPRequestHandler):
 server = ThreadingHTTPServer(("127.0.0.1", 0), Peer)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 from run_agent import AIAgent
-from hermes_state import SessionDB
+from chu_state import SessionDB
 from gateway.session import SessionStore, AsyncSessionStore, SessionSource
 from gateway.config import GatewayConfig, Platform
 from gateway.platforms.event import MessageEvent

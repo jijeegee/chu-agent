@@ -61,7 +61,7 @@ def _accepts_require_checkpoint(fn: Callable[..., Any]) -> bool:
 
 def _ctx_bound(fn: Callable[[], Any]) -> Callable[[], Any]:
     """Bind ``fn`` to the CALLER's contextvars for another thread: profile isolation is a
-    ContextVar-scoped HERMES_HOME override, and an unbound worker would silently use the default profile."""
+    ContextVar-scoped CHU_HOME override, and an unbound worker would silently use the default profile."""
     return partial(contextvars.copy_context().run, fn)
 
 
@@ -351,14 +351,14 @@ class MemoryManager:
         # ``clarify``, ``delegate_task``). Reject it here, at the door, so it never enters the routing table
         # at all — matching the built-ins-always-win invariant used by the TTS/browser/search provider
         # registries. See #40466.
-        from toolsets import _HERMES_CORE_TOOLS
+        from toolsets import _CHU_CORE_TOOLS
 
         for raw_schema in provider.get_tool_schemas():
             schema = normalize_tool_schema(raw_schema)
             if schema is None:
                 continue
             tool_name = schema["name"]
-            if tool_name in _HERMES_CORE_TOOLS:
+            if tool_name in _CHU_CORE_TOOLS:
                 logger.warning(
                     "Memory provider '%s' tool '%s' shadows a reserved core "
                     "tool name; registration ignored. Core tools always win — "
@@ -557,7 +557,7 @@ class MemoryManager:
     def get_all_tool_schemas(self) -> List[Dict[str, Any]]:
         """Collect deduplicated tool schemas from all providers; reserved core tool names are
         skipped because :meth:`add_provider` refuses to route them."""
-        from toolsets import _HERMES_CORE_TOOLS
+        from toolsets import _CHU_CORE_TOOLS
 
         schemas: List[Dict[str, Any]] = []
         seen = set()
@@ -570,7 +570,7 @@ class MemoryManager:
                         "Memory provider '%s' returned a tool schema with "
                         "no resolvable name; skipping (%r)", provider.name, raw_schema,
                     )
-                elif schema["name"] not in _HERMES_CORE_TOOLS and schema["name"] not in seen:
+                elif schema["name"] not in _CHU_CORE_TOOLS and schema["name"] not in seen:
                     schemas.append(schema)
                     seen.add(schema["name"])
 
@@ -818,9 +818,9 @@ class MemoryManager:
         )
 
     def initialize_all(self, session_id: str, **kwargs) -> None:
-        """Initialize all providers, injecting ``hermes_home`` so they resolve profile-scoped paths."""
-        if "hermes_home" not in kwargs:
-            from hermes_constants import get_hermes_home
-            kwargs["hermes_home"] = str(get_hermes_home())
+        """Initialize all providers, injecting ``chu_home`` so they resolve profile-scoped paths."""
+        if "chu_home" not in kwargs:
+            from chu_constants import get_chu_home
+            kwargs["chu_home"] = str(get_chu_home())
         self._each_provider("initialize failed", lambda p: p.initialize(session_id=session_id, **kwargs),
                             level=logging.WARNING)

@@ -3,12 +3,12 @@
 KEYLESS: the relay serves free-tier models anonymously and 401s any bearer it
 doesn't recognize, so this provider never sends a credential (the runtime
 resolver pins the keyless placeholder and an empty Authorization header; see
-hermes_cli.models.opencode_zen_free_runtime). Select via ``/model free``.
+chu_cli.models.opencode_zen_free_runtime). Select via ``/model free``.
 """
 
 from typing import Any
 
-from hermes_cli import __version__ as _HERMES_VERSION
+from chu_cli import __version__ as _CHU_VERSION
 from providers import register_provider
 from providers.base import ProviderProfile
 
@@ -45,8 +45,8 @@ opencode_free = OpenCodeFreeProfile(
     default_headers={
         "Authorization": "",
         "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-        "X-Title": "Hermes Agent",
-        "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
+        "X-Title": "Chu Agent",
+        "User-Agent": f"ChuAgent/{_CHU_VERSION}",
     },
     # laguna is the fastest non-UA-gated free model; big-pickle 429s every
     # client except the opencode CLI's own User-Agent.

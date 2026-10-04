@@ -15,15 +15,15 @@ import {
 } from './update-count'
 
 function createTempGitRepo() {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-update-count-'))
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'chu-update-count-'))
   const git = (...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 10_000 }).trim()
 
   try {
     git('init', '--quiet')
     git('config', 'commit.gpgSign', 'false')
     git('config', 'core.hooksPath', '.git/no-hooks')
-    git('config', 'user.name', 'Hermes Test')
-    git('config', 'user.email', 'hermes@example.invalid')
+    git('config', 'user.name', 'Chu Test')
+    git('config', 'user.email', 'chu@example.invalid')
 
     return { cwd, git }
   } catch (error) {

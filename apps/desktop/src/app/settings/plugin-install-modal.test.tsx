@@ -7,7 +7,7 @@ const { requestGateway } = vi.hoisted(() => ({ requestGateway: vi.fn() }))
 vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
   useGatewayRequest: () => ({ requestGateway })
 }))
-vi.mock('@/hermes', async importOriginal => ({
+vi.mock('@/chu', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getProfiles: async () => ({ profiles: [] })
 }))
@@ -44,7 +44,7 @@ beforeEach(() => {
   $gatewayState.set('idle')
   $activeGatewayProfile.set('default')
   probePluginRepo.mockResolvedValue({ ok: true, agent: true, desktop: true, warnings: [] })
-  vi.stubGlobal('hermesDesktop', { probePluginRepo, installDesktopPlugin })
+  vi.stubGlobal('chuDesktop', { probePluginRepo, installDesktopPlugin })
 })
 afterEach(() => {
   cleanup()
@@ -75,7 +75,7 @@ describe('Install from Git entry flow', () => {
         screen.getByText(
           mode === 'remote'
             ? 'Installs into the connected default backend'
-            : 'Installs into the default backend (~/.hermes/plugins/)'
+            : 'Installs into the default backend (~/.chu/plugins/)'
         )
       ).toBeTruthy()
       expect(screen.getByText("Installs into this app's local desktop-plugins folder")).toBeTruthy()

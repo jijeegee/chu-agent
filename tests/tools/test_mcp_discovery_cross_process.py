@@ -1,6 +1,6 @@
 """Cross-process regression coverage for MCP discovery serialization.
 
-Two independent Hermes processes can start MCP discovery at the same time
+Two independent Chu processes can start MCP discovery at the same time
 (dashboard and gateway startup).  The losing process must wait for the shared
 lock and then perform its own local discovery; another process's registry is
 not usable because ``_servers`` is process-local.
@@ -29,8 +29,8 @@ def _wait_for_file(path: Path, *, timeout: float = 10.0) -> None:
 
 def test_two_processes_each_complete_local_mcp_discovery(tmp_path):
     """A lock loser waits, acquires the lock, and builds its own registry."""
-    hermes_home = tmp_path / "hermes-home"
-    hermes_home.mkdir()
+    chu_home = tmp_path / "chu-home"
+    chu_home.mkdir()
 
     holder_ready = tmp_path / "holder-ready"
     release_holder = tmp_path / "release-holder"
@@ -117,7 +117,7 @@ def test_two_processes_each_complete_local_mcp_discovery(tmp_path):
     )
 
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(hermes_home)
+    env["CHU_HOME"] = str(chu_home)
 
     holder_started = tmp_path / "holder-started"
     holder = subprocess.Popen(

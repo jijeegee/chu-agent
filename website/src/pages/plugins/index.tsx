@@ -19,7 +19,7 @@ interface CatalogPlugin {
   tier: string;
   maintainer: string;
   subdir?: string;
-  requiresHermes?: string;
+  requiresChu?: string;
   platforms?: string[];
   capabilities?: PluginCapabilities;
   docsUrl?: string;
@@ -237,11 +237,11 @@ function PluginCard({
                 <span className={styles.metaValue}>{plugin.maintainer}</span>
               </div>
             )}
-            {plugin.requiresHermes && (
+            {plugin.requiresChu && (
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Requires</span>
                 <span className={styles.metaValue}>
-                  <code>hermes {plugin.requiresHermes}</code>
+                  <code>chu {plugin.requiresChu}</code>
                 </span>
               </div>
             )}
@@ -333,10 +333,10 @@ function buildSearchHaystack(p: CatalogPlugin): string {
 
 export default function PluginCatalogPage() {
   // Picker embed mode (?embed=picker): the page is iframed by a host app
-  // (Hermes desktop's Capabilities > Plugins tab) as a one-click catalog
+  // (Chu desktop's Capabilities > Plugins tab) as a one-click catalog
   // picker. Site chrome is hidden via CSS and every card gains an
   // "+ Add to this Agent" button that posts
-  //   { type: 'hermes-plugin-pick', name, repo, sha, subdir, tier,
+  //   { type: 'chu-plugin-pick', name, repo, sha, subdir, tier,
   //     installCmd }
   // to the parent window. The HOST performs the actual install through its
   // own gateway (plugins.manage, catalog_name=<name>) — this page never
@@ -349,13 +349,13 @@ export default function PluginCatalogPage() {
     if (typeof window === "undefined" || window.parent === window) return;
     window.parent.postMessage(
       {
-        type: "hermes-plugin-pick",
+        type: "chu-plugin-pick",
         name: plugin.name,
         repo: plugin.repo,
         sha: plugin.sha,
         subdir: plugin.subdir || "",
         tier: plugin.tier,
-        installCmd: plugin.installCommand || `hermes plugins install ${plugin.name}`,
+        installCmd: plugin.installCommand || `chu plugins install ${plugin.name}`,
       },
       "*"
     );
@@ -437,13 +437,13 @@ export default function PluginCatalogPage() {
   return (
     <Layout
       title="Plugin Catalog"
-      description="Browse reviewed, SHA-pinned plugins for Hermes Agent"
+      description="Browse reviewed, SHA-pinned plugins for Chu Agent"
     >
       <div className={`${styles.page} ${pickerMode ? styles.pickerMode : ""}`}>
         <header className={styles.hero}>
           <div className={styles.heroGlow} />
           <div className={styles.heroContent}>
-            <p className={styles.heroEyebrow}>Hermes Agent</p>
+            <p className={styles.heroEyebrow}>Chu Agent</p>
             <h1 className={styles.heroTitle}>Plugin Catalog</h1>
             <nav className={styles.crossNav} aria-label="Catalog pages">
               <Link className={styles.crossNavLink} to="/skills">
@@ -568,7 +568,7 @@ export default function PluginCatalogPage() {
               <div className={styles.emptyIcon}>{"\u{1F331}"}</div>
               <h3 className={styles.emptyTitle}>The catalog is just getting started</h3>
               <p className={styles.emptyDesc}>
-                The plugin catalog is a curated, human-reviewed list of Hermes
+                The plugin catalog is a curated, human-reviewed list of Chu
                 plugins — each entry pinned to an exact commit. Want yours listed?
                 Submissions are open.
               </p>

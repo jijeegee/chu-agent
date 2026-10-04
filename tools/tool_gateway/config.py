@@ -71,7 +71,7 @@ def _coerce_bool(value: Any, fallback: bool) -> bool:
 def load_config() -> ConnectorConfig:
     """Load connector config from the user config file."""
     try:
-        from hermes_cli.config import load_config_readonly as _load
+        from chu_cli.config import load_config_readonly as _load
 
         cfg = _load() or {}
         tools_cfg = cfg.get("tools") if isinstance(cfg.get("tools"), dict) else {}

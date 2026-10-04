@@ -376,7 +376,7 @@ test('a decryption failure logs the gateway host and path but not its credential
 
   assert.equal(loadNativeTokenSet(CRED_GATEWAY, locked.io), null)
   // Still identifies which gateway failed...
-  assert.match(locked.logs[0], /failed to decrypt stored tokens for https:\/\/gw\.example\.com\/hermes/)
+  assert.match(locked.logs[0], /failed to decrypt stored tokens for https:\/\/gw\.example\.com\/chu/)
   assert.match(locked.logs[0], /keeping stored entry for retry/)
   // ...without the userinfo.
   assert.doesNotMatch(locked.logs[0], /alice/)
@@ -390,7 +390,7 @@ test('a parsing failure logs the gateway host and path but not its credentials',
   const disk = createFakeDisk(JSON.stringify({ [CRED_GATEWAY]: { encoding: 'safeStorage', value: 'bm90LWpzb24=' } }))
 
   assert.equal(loadNativeTokenSet(CRED_GATEWAY, disk.io), null)
-  assert.match(disk.logs[0], /failed to load stored tokens for https:\/\/gw\.example\.com\/hermes/)
+  assert.match(disk.logs[0], /failed to load stored tokens for https:\/\/gw\.example\.com\/chu/)
   assert.doesNotMatch(disk.logs[0], /alice/)
   assert.doesNotMatch(disk.logs[0], /supersecret/)
 })

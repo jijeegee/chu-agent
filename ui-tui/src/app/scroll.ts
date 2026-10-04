@@ -1,4 +1,4 @@
-import type { ScrollBoxHandle } from '@hermes/ink'
+import type { ScrollBoxHandle } from '@chu/ink'
 
 import type { SelectionApi } from './interfaces.js'
 

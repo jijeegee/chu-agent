@@ -1,17 +1,17 @@
-"""Shared fixtures for the hermes-agent test suite.
+"""Shared fixtures for the chu-agent test suite.
 
 Hermetic-test invariants enforced here (see AGENTS.md for rationale):
 
 1. **No credential env vars.** All provider/credential-shaped env vars
    (ending in _API_KEY, _TOKEN, _SECRET, _PASSWORD, _CREDENTIALS, etc.)
    are unset before every test. Local developer keys cannot leak in.
-2. **Isolated HERMES_HOME.** HERMES_HOME points to a per-test tempdir so
-   code reading ``~/.hermes/*`` via ``get_hermes_home()`` can't see the
+2. **Isolated CHU_HOME.** CHU_HOME points to a per-test tempdir so
+   code reading ``~/.chu/*`` via ``get_chu_home()`` can't see the
    real one. (We do NOT also redirect HOME — that broke subprocesses in
-   CI. Code using ``Path.home() / ".hermes"`` instead of the canonical
-   ``get_hermes_home()`` is a bug to fix at the callsite.)
+   CI. Code using ``Path.home() / ".chu"`` instead of the canonical
+   ``get_chu_home()`` is a bug to fix at the callsite.)
 3. **Deterministic runtime.** TZ=UTC, LANG=C.UTF-8, PYTHONHASHSEED=0.
-4. **No HERMES_SESSION_* inheritance** — the agent's current gateway
+4. **No CHU_SESSION_* inheritance** — the agent's current gateway
    session must not leak into tests.
 
 These invariants make the local test run match CI closely. Gaps that
@@ -37,14 +37,14 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-# ── Sandbox HERMES_HOME before ANY test module is imported ──────────────────
-# `hermes_cli/main.py` calls `setup_logging()` at MODULE level, which resolves
-# `get_hermes_home()` and attaches rotating file handlers to the ROOT logger.
+# ── Sandbox CHU_HOME before ANY test module is imported ──────────────────
+# `chu_cli/main.py` calls `setup_logging()` at MODULE level, which resolves
+# `get_chu_home()` and attaches rotating file handlers to the ROOT logger.
 # So merely importing it - which many test modules do, directly or
 # transitively - points the whole pytest session's logging at the operator's
-# real `~/.hermes/logs/agent.log` and `errors.log`.
+# real `~/.chu/logs/agent.log` and `errors.log`.
 #
-# The `_isolate_env` fixture below also sandboxes HERMES_HOME, but fixtures run
+# The `_isolate_env` fixture below also sandboxes CHU_HOME, but fixtures run
 # AFTER collection imports test modules, by which point the handler already
 # holds an absolute path to the real log. Measured on a live install: 126
 # warnings in the operator's agent.log came from test runs, not the gateway -
@@ -54,31 +54,31 @@ if str(PROJECT_ROOT) not in sys.path:
 # window. The per-test fixture still applies for everything after import.
 #
 # ORDER MATTERS: the kanban write guard's deny-list (further down) must know
-# the REAL Hermes root — capture it BEFORE the sandbox rewires HERMES_HOME,
+# the REAL Chu root — capture it BEFORE the sandbox rewires CHU_HOME,
 # otherwise the deny-list would point at the throwaway tempdir and the guard
-# would silently stop protecting the operator's actual ~/.hermes (#69385).
-_PRE_SANDBOX_KANBAN_OVERRIDE = os.environ.get("HERMES_KANBAN_HOME", "").strip()
-_PRE_SANDBOX_HERMES_HOME = os.environ.get("HERMES_HOME", "")
+# would silently stop protecting the operator's actual ~/.chu (#69385).
+_PRE_SANDBOX_KANBAN_OVERRIDE = os.environ.get("CHU_KANBAN_HOME", "").strip()
+_PRE_SANDBOX_CHU_HOME = os.environ.get("CHU_HOME", "")
 
 
-def _hermes_home_points_at_production(value: str) -> bool:
-    """True when a pre-set HERMES_HOME resolves to the real production root.
+def _chu_home_points_at_production(value: str) -> bool:
+    """True when a pre-set CHU_HOME resolves to the real production root.
 
     Gateway-launched shells (and developer shells that ``export
-    HERMES_HOME=~/.hermes``) hand pytest the PRODUCTION home. Historically
+    CHU_HOME=~/.chu``) hand pytest the PRODUCTION home. Historically
     the session sandbox below honored any pre-set value, so collection-time
-    imports (logging handlers, ``hermes_state.DEFAULT_DB_PATH``) froze paths
-    inside the real ``~/.hermes`` — the escape vector that landed pytest
+    imports (logging handlers, ``chu_state.DEFAULT_DB_PATH``) froze paths
+    inside the real ``~/.chu`` — the escape vector that landed pytest
     fixture rows (chat-1 / wx-chat sessions, /tmp/pytest-of-* routing
     scopes) in the live state.db and flipped its journal mode under the
     WAL-mode gateway writer. Only a genuinely custom (non-production)
-    HERMES_HOME is honored now.
+    CHU_HOME is honored now.
     """
     if not value:
         return True
     try:
         resolved = Path(value).expanduser().resolve()
-        real_root = (Path.home() / ".hermes").resolve()
+        real_root = (Path.home() / ".chu").resolve()
     except Exception:
         return True
     if resolved == real_root:
@@ -87,32 +87,32 @@ def _hermes_home_points_at_production(value: str) -> bool:
     return resolved.parent.name == "profiles" and resolved.parent.parent == real_root
 
 
-if _hermes_home_points_at_production(os.environ.get("HERMES_HOME", "")):
-    _SESSION_HERMES_HOME = tempfile.mkdtemp(prefix="hermes-test-home-")
-    os.environ["HERMES_HOME"] = _SESSION_HERMES_HOME
-    atexit.register(shutil.rmtree, _SESSION_HERMES_HOME, True)
+if _chu_home_points_at_production(os.environ.get("CHU_HOME", "")):
+    _SESSION_CHU_HOME = tempfile.mkdtemp(prefix="chu-test-home-")
+    os.environ["CHU_HOME"] = _SESSION_CHU_HOME
+    atexit.register(shutil.rmtree, _SESSION_CHU_HOME, True)
 
 # Subprocess-surviving isolation marker (#82770). PYTEST_CURRENT_TEST /
 # PYTEST_VERSION are pytest's own vars, and tests that spawn children
 # routinely rebuild the child env and strip them ("the subprocess must look
-# like a real CLI") — which used to disarm hermes_state's live-DB guard in
-# the child at the same moment the child lost the HERMES_HOME redirect.
-# HERMES_TEST_ISOLATION is OUR marker: exported here (before any test module
+# like a real CLI") — which used to disarm chu_state's live-DB guard in
+# the child at the same moment the child lost the CHU_HOME redirect.
+# CHU_TEST_ISOLATION is OUR marker: exported here (before any test module
 # imports), inherited by every child by default, and honored by
-# hermes_state_guard._running_under_pytest() as a test-context signal. A child
+# chu_state_guard._running_under_pytest() as a test-context signal. A child
 # that carries it and still resolves the production state.db fails hard.
 # Tests that legitimately need a child to look like a non-test process AND
-# open a real DB must export HERMES_STATE_DB_GUARD_BYPASS=1 in that child's
+# open a real DB must export CHU_STATE_DB_GUARD_BYPASS=1 in that child's
 # env instead of stripping markers.
-os.environ["HERMES_TEST_ISOLATION"] = os.environ.get("HERMES_HOME", "") or "1"
+os.environ["CHU_TEST_ISOLATION"] = os.environ.get("CHU_HOME", "") or "1"
 
-#: HERMES_HOME as it stood when conftest was imported - i.e. before any test
+#: CHU_HOME as it stood when conftest was imported - i.e. before any test
 #: module could import code that configures logging. Recorded so the guard in
 #: tests/test_log_isolation.py can assert the sandbox existed AT THAT MOMENT.
 #: Reading os.environ from inside a test is useless here: the per-test
 #: `_isolate_env` fixture has sandboxed it by then, so the check would pass
 #: even with this block removed.
-HERMES_HOME_AT_CONFTEST_IMPORT = os.environ.get("HERMES_HOME", "")
+CHU_HOME_AT_CONFTEST_IMPORT = os.environ.get("CHU_HOME", "")
 
 
 # ── Per-file process isolation ──────────────────────────────────────────────
@@ -252,87 +252,87 @@ def _looks_like_credential(name: str) -> bool:
     return any(name.endswith(suf) for suf in _CREDENTIAL_SUFFIXES)
 
 
-# HERMES_* vars that change test behavior by being set. Unset all of these
+# CHU_* vars that change test behavior by being set. Unset all of these
 # unconditionally — individual tests that need them set do so explicitly.
-_HERMES_BEHAVIORAL_VARS = frozenset({
+_CHU_BEHAVIORAL_VARS = frozenset({
     # Voice/TTS runtime flags. ``tui_gateway/server.py`` reads these straight
     # off ``os.environ`` at call time (``_voice_mode_enabled`` /
     # ``_voice_tts_enabled``) and, on every completed turn, hands the turn's
-    # final response text to ``hermes_cli.voice.speak_text`` — real synthesis,
+    # final response text to ``chu_cli.voice.speak_text`` — real synthesis,
     # real playback, out of the developer's speakers. Blank them per-test so a
     # leak (from the shell, or from an earlier test that drove the
     # ``voice.toggle`` RPC, which writes ``os.environ`` directly) cannot carry
     # into the next test. See ``_audio_playback_guard`` for the second layer.
-    "HERMES_VOICE",
-    "HERMES_VOICE_TTS",
-    "HERMES_YOLO_MODE",
+    "CHU_VOICE",
+    "CHU_VOICE_TTS",
+    "CHU_YOLO_MODE",
     # Injected into subprocess envs by the terminal tool (_make_run_env), so
-    # any test run launched FROM a Hermes agent session inherits them and
-    # hermes_constants home-resolution helpers prefer them over monkeypatched
+    # any test run launched FROM a Chu agent session inherits them and
+    # chu_constants home-resolution helpers prefer them over monkeypatched
     # HOME (test_subprocess_home_isolation red locally, green on CI).
-    "HERMES_REAL_HOME",
+    "CHU_REAL_HOME",
     "TERMINAL_HOME_MODE",
-    "HERMES_INTERACTIVE",
-    "HERMES_QUIET",
-    "HERMES_TOOL_PROGRESS",
-    "HERMES_TOOL_PROGRESS_MODE",
-    "HERMES_MAX_ITERATIONS",
-    "HERMES_SESSION_PLATFORM",
-    "HERMES_SESSION_CHAT_ID",
-    "HERMES_SESSION_CHAT_NAME",
-    "HERMES_SESSION_CHAT_TYPE",
-    "HERMES_SESSION_THREAD_ID",
-    "HERMES_SESSION_SOURCE",
-    "HERMES_SESSION_KEY",
-    "HERMES_GATEWAY_SESSION",
-    "HERMES_CRON_SESSION",
-    "_HERMES_GATEWAY",
-    "HERMES_PLATFORM",
-    "HERMES_MODEL",
-    "HERMES_INFERENCE_MODEL",
-    "HERMES_INFERENCE_PROVIDER",
-    "HERMES_TUI_PROVIDER",
-    "HERMES_MANAGED",
-    "HERMES_MANAGED_DIR",
-    "HERMES_DEV",
-    "HERMES_CONTAINER",
-    "HERMES_EPHEMERAL_SYSTEM_PROMPT",
-    "HERMES_TIMEZONE",
-    "HERMES_REDACT_SECRETS",
-    "HERMES_BACKGROUND_NOTIFICATIONS",
-    "HERMES_EXEC_ASK",
-    "HERMES_HOME_MODE",
-    "HERMES_AGENT_USE_LEGACY_SESSION_KEYS",
+    "CHU_INTERACTIVE",
+    "CHU_QUIET",
+    "CHU_TOOL_PROGRESS",
+    "CHU_TOOL_PROGRESS_MODE",
+    "CHU_MAX_ITERATIONS",
+    "CHU_SESSION_PLATFORM",
+    "CHU_SESSION_CHAT_ID",
+    "CHU_SESSION_CHAT_NAME",
+    "CHU_SESSION_CHAT_TYPE",
+    "CHU_SESSION_THREAD_ID",
+    "CHU_SESSION_SOURCE",
+    "CHU_SESSION_KEY",
+    "CHU_GATEWAY_SESSION",
+    "CHU_CRON_SESSION",
+    "_CHU_GATEWAY",
+    "CHU_PLATFORM",
+    "CHU_MODEL",
+    "CHU_INFERENCE_MODEL",
+    "CHU_INFERENCE_PROVIDER",
+    "CHU_TUI_PROVIDER",
+    "CHU_MANAGED",
+    "CHU_MANAGED_DIR",
+    "CHU_DEV",
+    "CHU_CONTAINER",
+    "CHU_EPHEMERAL_SYSTEM_PROMPT",
+    "CHU_TIMEZONE",
+    "CHU_REDACT_SECRETS",
+    "CHU_BACKGROUND_NOTIFICATIONS",
+    "CHU_EXEC_ASK",
+    "CHU_HOME_MODE",
+    "CHU_AGENT_USE_LEGACY_SESSION_KEYS",
     # Kanban path/board pins must never leak from a developer shell or
     # dispatched worker into tests; otherwise tests can write fake tasks to
-    # the real ~/.hermes/kanban.db instead of the per-test HERMES_HOME.
-    "HERMES_KANBAN_DB",
-    "HERMES_KANBAN_BOARD",
-    "HERMES_KANBAN_HOME",
-    "HERMES_KANBAN_WORKSPACES_ROOT",
-    "HERMES_KANBAN_LOGS_ROOT",
-    "HERMES_KANBAN_TASK",
-    "HERMES_KANBAN_WORKSPACE",
-    "HERMES_KANBAN_RUN_ID",
-    "HERMES_KANBAN_CLAIM_LOCK",
-    "HERMES_KANBAN_DISPATCH_IN_GATEWAY",
+    # the real ~/.chu/kanban.db instead of the per-test CHU_HOME.
+    "CHU_KANBAN_DB",
+    "CHU_KANBAN_BOARD",
+    "CHU_KANBAN_HOME",
+    "CHU_KANBAN_WORKSPACES_ROOT",
+    "CHU_KANBAN_LOGS_ROOT",
+    "CHU_KANBAN_TASK",
+    "CHU_KANBAN_WORKSPACE",
+    "CHU_KANBAN_RUN_ID",
+    "CHU_KANBAN_CLAIM_LOCK",
+    "CHU_KANBAN_DISPATCH_IN_GATEWAY",
     # Pytest is routinely launched from a delegated worker.  The worker
     # lineage marker must not make parent-state tests run as delegated
     # children; tests that exercise child behavior set it explicitly.
-    "HERMES_DELEGATED_CHILD_CONTEXT",
-    "HERMES_TENANT",
+    "CHU_DELEGATED_CHILD_CONTEXT",
+    "CHU_TENANT",
     # Honcho host selection changes which nested config block wins. A local
     # shell override leaked "myhost" into the full suite and flipped 20
-    # otherwise-unrelated config tests away from the default "hermes" host.
-    "HERMES_HONCHO_HOST",
+    # otherwise-unrelated config tests away from the default "chu" host.
+    "CHU_HONCHO_HOST",
     # Dashboard OAuth auth gate (PR #30156). When set, the bundled
     # dashboard-auth `nous` plugin auto-registers itself on plugin discovery,
     # which is triggered by any `/api/status` call. That leaks a provider
     # into the dashboard_auth registry across tests in the same worker and
     # makes assertions like `auth_providers == []` flaky. CI never sets
     # these, so production tests must not see them either.
-    "HERMES_DASHBOARD_OAUTH_CLIENT_ID",
-    "HERMES_DASHBOARD_PORTAL_URL",
+    "CHU_DASHBOARD_OAUTH_CLIENT_ID",
+    "CHU_DASHBOARD_PORTAL_URL",
     "TERMINAL_CWD",
     "TERMINAL_ENV",
     "TERMINAL_VERCEL_RUNTIME",
@@ -456,8 +456,8 @@ _HERMES_BEHAVIORAL_VARS = frozenset({
 def _hermetic_environment(tmp_path, monkeypatch):
     """Blank out all credential/behavioral env vars so local and CI match.
 
-    Also redirects HOME and HERMES_HOME to per-test tempdirs so code that
-    reads ``~/.hermes/*`` can't touch the real one, and pins TZ/LANG so
+    Also redirects HOME and CHU_HOME to per-test tempdirs so code that
+    reads ``~/.chu/*`` can't touch the real one, and pins TZ/LANG so
     datetime/locale-sensitive tests are deterministic.
     """
     # 1. Blank every credential-shaped env var that's currently set.
@@ -465,8 +465,8 @@ def _hermetic_environment(tmp_path, monkeypatch):
         if _looks_like_credential(name):
             monkeypatch.delenv(name, raising=False)
 
-    # 2. Blank behavioral HERMES_* vars that could change test semantics.
-    for name in _HERMES_BEHAVIORAL_VARS:
+    # 2. Blank behavioral CHU_* vars that could change test semantics.
+    for name in _CHU_BEHAVIORAL_VARS:
         monkeypatch.delenv(name, raising=False)
 
     # Honcho's fallback host/config resolution legitimately reads the user's
@@ -474,46 +474,46 @@ def _hermetic_environment(tmp_path, monkeypatch):
     # on it), but pin the host so ordinary tests cannot inherit a developer's
     # defaultHost and silently select the wrong nested config block. Tests of
     # custom host resolution override/delete this explicitly.
-    monkeypatch.setenv("HERMES_HONCHO_HOST", "hermes")
+    monkeypatch.setenv("CHU_HONCHO_HOST", "chu")
 
-    # 3. Redirect HERMES_HOME to a per-test tempdir. Code that reads
-    #    ``~/.hermes/*`` via ``get_hermes_home()`` now gets the tempdir.
+    # 3. Redirect CHU_HOME to a per-test tempdir. Code that reads
+    #    ``~/.chu/*`` via ``get_chu_home()`` now gets the tempdir.
     #
     #    NOTE: We do NOT also redirect HOME. Doing so broke CI because
     #    some tests (and their transitive deps) spawn subprocesses that
     #    inherit HOME and expect it to be stable. If a test genuinely
     #    needs HOME isolated, it should set it explicitly in its own
-    #    fixture. Any code in the codebase reading ``~/.hermes/*`` via
-    #    ``Path.home() / ".hermes"`` instead of ``get_hermes_home()``
+    #    fixture. Any code in the codebase reading ``~/.chu/*`` via
+    #    ``Path.home() / ".chu"`` instead of ``get_chu_home()``
     #    is a bug to fix at the callsite.
-    fake_hermes_home = tmp_path / "hermes_test"
-    fake_hermes_home.mkdir()
-    (fake_hermes_home / "sessions").mkdir()
-    (fake_hermes_home / "cron").mkdir()
-    (fake_hermes_home / "memories").mkdir()
-    (fake_hermes_home / "skills").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(fake_hermes_home))
+    fake_chu_home = tmp_path / "chu_test"
+    fake_chu_home.mkdir()
+    (fake_chu_home / "sessions").mkdir()
+    (fake_chu_home / "cron").mkdir()
+    (fake_chu_home / "memories").mkdir()
+    (fake_chu_home / "skills").mkdir()
+    monkeypatch.setenv("CHU_HOME", str(fake_chu_home))
     # Keep the subprocess-surviving isolation marker pointed at THIS test's
     # home (#82770): children spawned by the test inherit it by default, so
-    # hermes_state's live-DB guard stays armed in them even when the test
+    # chu_state's live-DB guard stays armed in them even when the test
     # strips pytest's own PYTEST_* vars from the child env.
-    monkeypatch.setenv("HERMES_TEST_ISOLATION", str(fake_hermes_home))
+    monkeypatch.setenv("CHU_TEST_ISOLATION", str(fake_chu_home))
     # And never let a developer-shell (or leaked child) bypass disarm the
     # guard for in-process code under test.
-    monkeypatch.delenv("HERMES_STATE_DB_GUARD_BYPASS", raising=False)
+    monkeypatch.delenv("CHU_STATE_DB_GUARD_BYPASS", raising=False)
 
-    # 3b. hermes_state computes ``DEFAULT_DB_PATH = get_hermes_home() / "state.db"``
+    # 3b. chu_state computes ``DEFAULT_DB_PATH = get_chu_home() / "state.db"``
     #     at import time. When the module is first imported at collection (any
-    #     test file with a top-level ``from hermes_state import ...``) that
+    #     test file with a top-level ``from chu_state import ...``) that
     #     happens BEFORE this fixture ever runs, so every argless
     #     ``SessionDB()`` in every test opens the developer's REAL state.db —
     #     reading real sessions into assertions and writing test rows into the
     #     real profile. Re-pin the constant to this test's home. (Several test
     #     files already do this locally; this makes it an invariant.)
-    hermes_state_mod = sys.modules.get("hermes_state")
-    if hermes_state_mod is not None and hasattr(hermes_state_mod, "DEFAULT_DB_PATH"):
+    chu_state_mod = sys.modules.get("chu_state")
+    if chu_state_mod is not None and hasattr(chu_state_mod, "DEFAULT_DB_PATH"):
         monkeypatch.setattr(
-            hermes_state_mod, "DEFAULT_DB_PATH", fake_hermes_home / "state.db"
+            chu_state_mod, "DEFAULT_DB_PATH", fake_chu_home / "state.db"
         )
 
     # 4. Deterministic locale / timezone / hashseed. CI runs in UTC with
@@ -543,17 +543,17 @@ def _hermetic_environment(tmp_path, monkeypatch):
     # suite timeout under tests that set fake proxy env vars. The kill-switch
     # makes ensure() raise FeatureUnavailable immediately instead.
     # tests/tools/test_lazy_deps.py overrides this var in both directions.
-    monkeypatch.setenv("HERMES_DISABLE_LAZY_INSTALLS", "1")
+    monkeypatch.setenv("CHU_DISABLE_LAZY_INSTALLS", "1")
 
     # 5. Reset plugin singleton so tests don't leak plugins from
-    #    ~/.hermes/plugins/ (which, per step 3, is now empty — but the
+    #    ~/.chu/plugins/ (which, per step 3, is now empty — but the
     #    singleton might still be cached from a previous test).
     try:
-        import hermes_cli.plugins as _plugins_mod
+        import chu_cli.plugins as _plugins_mod
         monkeypatch.setattr(_plugins_mod, "_plugin_manager", None)
         # Also clear the keyed per-home manager cache (and any plugin
         # submodules it left in sys.modules) so a manager built for a
-        # previous test's tmp_path HERMES_HOME can't leak forward. Paths
+        # previous test's tmp_path CHU_HOME can't leak forward. Paths
         # are unique per test, so collisions are unlikely, but a full
         # reset keeps this fixture the single source of plugin-state
         # hygiene rather than relying on path uniqueness.
@@ -569,7 +569,7 @@ def _hermetic_environment(tmp_path, monkeypatch):
 # Backward-compat alias — old tests reference this fixture name. Keep it
 # as a no-op wrapper so imports don't break.
 @pytest.fixture(autouse=True)
-def _isolate_hermes_home(_hermetic_environment):
+def _isolate_chu_home(_hermetic_environment):
     """Alias preserved for any test that yields this name explicitly."""
     return None
 
@@ -590,7 +590,7 @@ def _neutralize_kanban_memory_guard(request, monkeypatch):
     if request.node.get_closest_marker("real_memory_guard"):
         return
     try:
-        from hermes_cli import kanban_db_dispatch as _kbd_mod
+        from chu_cli import kanban_db_dispatch as _kbd_mod
     except Exception:
         return
     monkeypatch.setattr(_kbd_mod, "_system_memory_sample", lambda: {}, raising=False)
@@ -647,11 +647,11 @@ def _neutralize_macos_keychain_creds(request, monkeypatch):
 
 # ── Kanban write guard (#69283) ─────────────────────────────────────────────
 # When hermetic isolation is bypassed (stale checkout, wrong rootdir, direct
-# invocation), kanban writes silently pollute the real ~/.hermes. This autouse
+# invocation), kanban writes silently pollute the real ~/.chu. This autouse
 # fixture patches ``kanban_db_connect.connect`` to refuse writes whose resolved DB
 # path lands under the REAL kanban root (captured at import time, before any
 # fixture rewires the environment). A deny-list is used instead of an
-# allow-list because test-level fixtures legitimately move HERMES_HOME to
+# allow-list because test-level fixtures legitimately move CHU_HOME to
 # sibling directories — an allow-list captured at setup time would see the
 # stale autouse-set value and falsely reject hermetic tests (#69385 review).
 
@@ -660,27 +660,27 @@ def _capture_real_kanban_root() -> Path:
     """Resolve the REAL kanban root from the pre-test environment.
 
     Uses the pre-sandbox environment snapshot taken at the very top of this
-    file (before the session HERMES_HOME sandbox rewired the env), so the
+    file (before the session CHU_HOME sandbox rewired the env), so the
     deny-list keeps pointing at the operator's actual root. Mirrors
     ``kanban_db.kanban_home()`` resolution order:
-    1. ``HERMES_KANBAN_HOME`` env var when set and non-empty
-    2. the real (pre-sandbox) Hermes root otherwise
+    1. ``CHU_KANBAN_HOME`` env var when set and non-empty
+    2. the real (pre-sandbox) Chu root otherwise
     """
     if _PRE_SANDBOX_KANBAN_OVERRIDE:
         return Path(_PRE_SANDBOX_KANBAN_OVERRIDE).expanduser().resolve()
-    if _PRE_SANDBOX_HERMES_HOME and not _hermes_home_points_at_production(
-        _PRE_SANDBOX_HERMES_HOME
+    if _PRE_SANDBOX_CHU_HOME and not _chu_home_points_at_production(
+        _PRE_SANDBOX_CHU_HOME
     ):
-        # HERMES_HOME was genuinely set to a CUSTOM root before the sandbox
+        # CHU_HOME was genuinely set to a CUSTOM root before the sandbox
         # (production-pointing values are sandboxed away above, in which case
         # the env still holds the tempdir and the resolver would be wrong) —
         # honor it via the normal resolver (it may be a profile dir whose
         # root matters).
-        from hermes_constants import get_default_hermes_root
-        return get_default_hermes_root().resolve()
-    # No pre-existing HERMES_HOME: the real root is the platform default,
+        from chu_constants import get_default_chu_root
+        return get_default_chu_root().resolve()
+    # No pre-existing CHU_HOME: the real root is the platform default,
     # NOT the sandbox tempdir now sitting in the env.
-    return (Path.home() / ".hermes").resolve()
+    return (Path.home() / ".chu").resolve()
 
 
 _REAL_KANBAN_ROOT = _capture_real_kanban_root()
@@ -692,23 +692,23 @@ def _kanban_write_guard(_hermetic_environment, monkeypatch):
 
     Uses a **deny-list**: only blocks writes where the resolved DB path
     (explicit ``db_path`` or ``kanban_db_path()``) lands under the real
-    ``~/.hermes`` captured at import time. Hermetic tests that legitimately
-    move HERMES_HOME to sibling tempdirs are unaffected.
+    ``~/.chu`` captured at import time. Hermetic tests that legitimately
+    move CHU_HOME to sibling tempdirs are unaffected.
 
-    Only patches when ``hermes_cli.kanban_db_connect`` is *already imported*
+    Only patches when ``chu_cli.kanban_db_connect`` is *already imported*
     — a ``sys.modules`` probe, not an import — so the guard never drags the
     kanban module into unrelated test processes.
 
     Uses ``monkeypatch.setattr`` so pytest restores ``connect`` automatically
     after each test (no stacked wrappers or state leakage across tests).
     """
-    _kdb = sys.modules.get("hermes_cli.kanban_db")
-    _kdbc = sys.modules.get("hermes_cli.kanban_db_connect")
+    _kdb = sys.modules.get("chu_cli.kanban_db")
+    _kdbc = sys.modules.get("chu_cli.kanban_db_connect")
     if _kdb is None or _kdbc is None:
         return
 
     # The sys.modules probe can observe the module MID-IMPORT: a fixture
-    # boundary firing while another test's lazy `import hermes_cli.kanban_db`
+    # boundary firing while another test's lazy `import chu_cli.kanban_db`
     # is still executing sees a partially initialized module whose `connect`
     # doesn't exist yet (AttributeError flake, caught in a full-suite run).
     # A half-imported module has no callers yet either — nothing to guard
@@ -735,7 +735,7 @@ def _kanban_write_guard(_hermetic_environment, monkeypatch):
             f"kanban_write_guard: kanban DB path resolved to {resolved}, "
             f"which is under the REAL kanban root ({_REAL_KANBAN_ROOT}). "
             f"Hermetic isolation has been bypassed — refusing to write "
-            f"to the real ~/.hermes. See #69283."
+            f"to the real ~/.chu. See #69283."
         )
 
     monkeypatch.setattr(_kdbc, "connect", _guarded_connect)
@@ -743,23 +743,23 @@ def _kanban_write_guard(_hermetic_environment, monkeypatch):
 
 # ── Live state.db write guard ───────────────────────────────────────────────
 # Companion to the kanban guard above, for the MAIN state database.
-# ``hermes_state._ensure_test_isolation`` (the single choke point every
+# ``chu_state._ensure_test_isolation`` (the single choke point every
 # ``SessionDB()`` construction goes through) refuses, under pytest, any DB
-# path that resolves inside the REAL Hermes root. This fixture wires the
+# path that resolves inside the REAL Chu root. This fixture wires the
 # test-side knobs:
 #   • honors ``@pytest.mark.live_system_guard_bypass`` (the established
 #     escape-hatch marker) by disabling the state-db guard for that test;
 #   • injects the pre-sandbox CUSTOM production root (Docker/portable
-#     installs where HERMES_HOME is not ~/.hermes) into the guard's
+#     installs where CHU_HOME is not ~/.chu) into the guard's
 #     deny-list, mirroring the kanban deny-list capture above.
 # The guard itself is env-activated (PYTEST_CURRENT_TEST / PYTEST_VERSION),
-# so subprocess children that import hermes_state directly are covered even
+# so subprocess children that import chu_state directly are covered even
 # without this fixture.
 
 
 @pytest.fixture(autouse=True)
 def _state_db_write_guard(request, monkeypatch):
-    _hs = sys.modules.get("hermes_state")
+    _hs = sys.modules.get("chu_state")
     if _hs is None or not hasattr(_hs, "_STATE_DB_GUARD_BYPASS"):
         yield
         return
@@ -768,11 +768,11 @@ def _state_db_write_guard(request, monkeypatch):
         yield
         return
     extra_roots = []
-    if _PRE_SANDBOX_HERMES_HOME and not _hermes_home_points_at_production(
-        _PRE_SANDBOX_HERMES_HOME
+    if _PRE_SANDBOX_CHU_HOME and not _chu_home_points_at_production(
+        _PRE_SANDBOX_CHU_HOME
     ):
         extra_roots.append(
-            Path(_PRE_SANDBOX_HERMES_HOME).expanduser().resolve()
+            Path(_PRE_SANDBOX_CHU_HOME).expanduser().resolve()
         )
     monkeypatch.setattr(
         _hs, "_STATE_DB_GUARD_EXTRA_DENY_ROOTS", tuple(extra_roots)
@@ -883,15 +883,15 @@ def _reset_tui_gateway_server_state():
         mod._db = None
         mod._db_error = None
 
-    # A leaked context-local Hermes home override redirects every later
-    # ``get_hermes_home()`` call (active-session registry, config paths)
+    # A leaked context-local Chu home override redirects every later
+    # ``get_chu_home()`` call (active-session registry, config paths)
     # to a stale per-test tmpdir. Force the main-thread ContextVar back
     # to its default.
     try:
-        from hermes_constants import get_hermes_home_override, set_hermes_home_override
+        from chu_constants import get_chu_home_override, set_chu_home_override
 
-        if get_hermes_home_override() is not None:
-            set_hermes_home_override(None)
+        if get_chu_home_override() is not None:
+            set_chu_home_override(None)
     except Exception:
         pass
 
@@ -904,7 +904,7 @@ def tmp_dir(tmp_path):
 
 @pytest.fixture()
 def mock_config():
-    """Return a minimal hermes config dict suitable for unit tests."""
+    """Return a minimal chu config dict suitable for unit tests."""
     return {
         "model": "test/mock-model",
         "toolsets": ["terminal", "file"],
@@ -977,10 +977,10 @@ def _ensure_current_event_loop(request):
 # (``cmd_update``, ``kill_gateway_processes``, ``stop_profile_gateway``).
 # When a single test forgets to mock either ``os.kill`` or the global
 # ``find_gateway_pids`` helper, the real call leaks out of the hermetic
-# environment and finds the developer's live ``hermes-gateway`` process
+# environment and finds the developer's live ``chu-gateway`` process
 # via ``psutil`` — sending it SIGTERM mid-test. The shutdown forensics in
 # PR #23285 caught this happening 5+ times in 3 days, every time
-# correlated with a ``tests/hermes_cli/`` pytest run starting up.
+# correlated with a ``tests/chu_cli/`` pytest run starting up.
 #
 # This fixture makes the leak impossible by intercepting the two
 # primitives that actually do damage:
@@ -989,7 +989,7 @@ def _ensure_current_event_loop(request):
 #    a hard ``RuntimeError`` so the offending test gets a stack trace
 #    instead of silently murdering the real gateway.
 #  • ``subprocess.run`` / ``subprocess.Popen`` / ``call`` / ``check_call`` /
-#    ``check_output`` reject any ``systemctl ... <verb> hermes-gateway``
+#    ``check_output`` reject any ``systemctl ... <verb> chu-gateway``
 #    invocation that would mutate the live unit. Read-only systemctl
 #    calls (``status``, ``show``, ``list-units``) still pass through.
 #
@@ -1006,9 +1006,9 @@ _REQUIRES_WAL_MARK = "requires_wal"
 
 
 def _wal_is_usable() -> bool:
-    """True when Hermes will actually put a database into WAL mode here.
+    """True when Chu will actually put a database into WAL mode here.
 
-    Hermes refuses journal_mode=WAL on SQLite builds carrying the upstream
+    Chu refuses journal_mode=WAL on SQLite builds carrying the upstream
     WAL-reset corruption bug (3.7.0–3.51.2, excluding backports 3.50.7 /
     3.44.6) and falls back to DELETE. On such a build NO ``-wal`` sidecar is
     ever created, so a test asserting on WAL frames, ``-wal`` file size, or
@@ -1016,17 +1016,17 @@ def _wal_is_usable() -> bool:
     declined to enable, not a regression.
 
     This matters because the interpreter running the tests and the interpreter
-    running Hermes can link DIFFERENT SQLite versions: a repo ``.venv`` on
-    3.50.4 (vulnerable → DELETE) alongside a Hermes managed runtime on 3.53.1
+    running Chu can link DIFFERENT SQLite versions: a repo ``.venv`` on
+    3.50.4 (vulnerable → DELETE) alongside a Chu managed runtime on 3.53.1
     (fixed → WAL). The same test then passes in one and fails in the other.
 
-    IMPORTANT: this must NOT import ``hermes_state``. That module computes
-    ``DEFAULT_DB_PATH`` from ``get_hermes_home()`` at import time, so importing
-    it during collection — before the per-test ``_isolate_hermes_home`` fixture
-    redirects ``HERMES_HOME`` — permanently caches the DEVELOPER'S REAL
-    ``~/.hermes/state.db`` for the whole session. Tests then read live
+    IMPORTANT: this must NOT import ``chu_state``. That module computes
+    ``DEFAULT_DB_PATH`` from ``get_chu_home()`` at import time, so importing
+    it during collection — before the per-test ``_isolate_chu_home`` fixture
+    redirects ``CHU_HOME`` — permanently caches the DEVELOPER'S REAL
+    ``~/.chu/state.db`` for the whole session. Tests then read live
     production sessions instead of a tempdir. The version predicate is
-    duplicated from ``hermes_state._is_sqlite_wal_reset_vulnerable`` (upstream
+    duplicated from ``chu_state._is_sqlite_wal_reset_vulnerable`` (upstream
     fixed ranges, stable) rather than imported, and
     ``test_conftest_wal_gate.py`` pins the two implementations in agreement.
     """
@@ -1053,14 +1053,14 @@ def _wal_is_usable() -> bool:
 #   1. ``test_voice_toggle_tts_branch_also_carries_record_key`` drives the
 #      ``voice.toggle`` RPC with ``action="tts"``. The handler
 #      (``tui_gateway/server.py``) flips the flag by writing the *real*
-#      process environment: ``os.environ["HERMES_VOICE_TTS"] = "1"``. The
+#      process environment: ``os.environ["CHU_VOICE_TTS"] = "1"``. The
 #      test's ``monkeypatch.delenv(..., raising=False)`` records no undo entry
 #      (pytest only records an undo when the key was present), so the "1"
 #      survives teardown and persists for the rest of the pytest process.
 #   2. Any later test in that process that drives a turn to completion hits
 #      the TTS dispatch in ``prompt.submit``, which checks
 #      ``_voice_tts_enabled()`` — now true — and fires
-#      ``hermes_cli.voice.speak_text(final_response)`` on a daemon thread.
+#      ``chu_cli.voice.speak_text(final_response)`` on a daemon thread.
 #   3. ``speak_text`` needs no API key to be audible: ``tools/tts_tool.py``
 #      defaults to the ``edge`` provider, which is keyless.
 #
@@ -1071,12 +1071,12 @@ def _wal_is_usable() -> bool:
 # live-system guard intercepts ``os.kill`` rather than trusting every caller
 # to mock it:
 #
-#  • ``hermes_cli.voice.speak_text`` — the synth+playback entry point both
+#  • ``chu_cli.voice.speak_text`` — the synth+playback entry point both
 #    gateway call sites late-import, so patching the module attribute catches
 #    them wherever they import it from.
-#  • ``hermes_cli.voice.play_audio_file`` — the module-level binding
+#  • ``chu_cli.voice.play_audio_file`` — the module-level binding
 #    ``speak_text`` actually plays through. Patching the binding inside
-#    ``hermes_cli.voice`` (not ``tools.voice_mode``) keeps the real function
+#    ``chu_cli.voice`` (not ``tools.voice_mode``) keeps the real function
 #    available to the tests that legitimately exercise it with a mocked
 #    audio backend (``tests/tools/test_voice_mode.py``).
 #
@@ -1090,9 +1090,9 @@ _ALLOW_MACOS_KEYCHAIN_MARK = "allow_macos_keychain"
 # ---------------------------------------------------------------------------
 # OS gating
 #
-# Hermes runs on Linux, macOS and native Windows, and a lot of its behaviour
+# Chu runs on Linux, macOS and native Windows, and a lot of its behaviour
 # genuinely differs per host: PTY vs pywinpty, taskkill vs SIGTERM, launchd
-# vs systemd, Keychain vs libsecret, ``%LOCALAPPDATA%`` vs ``~/.hermes``.
+# vs systemd, Keychain vs libsecret, ``%LOCALAPPDATA%`` vs ``~/.chu``.
 #
 # Historically those code paths were tested by *faking* the host — patching
 # ``sys.platform`` to ``"win32"`` inside a Linux CI job. That gives a green
@@ -1163,7 +1163,7 @@ def pytest_configure(config):  # noqa: D401 — pytest hook
     config.addinivalue_line(
         "markers",
         f"{_REQUIRES_WAL_MARK}: test needs the runtime to actually enable "
-        "SQLite WAL mode; skipped on builds where Hermes falls back to "
+        "SQLite WAL mode; skipped on builds where Chu falls back to "
         "journal_mode=DELETE for the WAL-reset bug.",
     )
     config.addinivalue_line(
@@ -1286,7 +1286,7 @@ def pytest_collection_modifyitems(config, items):  # noqa: D401 — pytest hook
         return
 
     reason = (
-        f"SQLite {sqlite3.sqlite_version} has the WAL-reset bug — Hermes uses "
+        f"SQLite {sqlite3.sqlite_version} has the WAL-reset bug — Chu uses "
         "journal_mode=DELETE here, so no -wal sidecar exists to assert on"
     )
     skip_marker = pytest.mark.skip(reason=reason)
@@ -1312,10 +1312,10 @@ def _live_system_guard(request, monkeypatch):
       • pty.spawn
       • asyncio.create_subprocess_exec / create_subprocess_shell
     Subprocess inspection looks at the WHOLE command string (not just
-    tokens[0]), so ``bash -c "systemctl restart hermes-gateway"``,
+    tokens[0]), so ``bash -c "systemctl restart chu-gateway"``,
     ``sudo systemctl ...``, ``env systemctl ...``, ``setsid systemctl ...``
     are all caught. ``pkill``/``killall``/``taskkill`` invocations
-    targeting hermes/python patterns are also blocked.
+    targeting chu/python patterns are also blocked.
     """
     if request.node.get_closest_marker(_LIVE_SYSTEM_GUARD_BYPASS_MARK):
         yield
@@ -1414,13 +1414,13 @@ def _live_system_guard(request, monkeypatch):
         monkeypatch.setattr(_os, "killpg", _guarded_killpg)
 
     # ── Subprocess command-string inspection (whole-line) ──────────
-    _HERMES_TOKENS = (
-        "hermes-gateway",
-        "hermes.service",
-        "hermes_cli.main gateway",
-        "hermes_cli/main.py gateway",
+    _CHU_TOKENS = (
+        "chu-gateway",
+        "chu.service",
+        "chu_cli.main gateway",
+        "chu_cli/main.py gateway",
         "gateway/run.py",
-        "hermes gateway",
+        "chu gateway",
     )
     _MUTATING_VERBS = (
         "restart", "start", "stop", "kill", "reload",
@@ -1460,15 +1460,15 @@ def _live_system_guard(request, monkeypatch):
                 return ""
         return str(cmd)
 
-    def _matches_hermes_gateway(cmd_str: str) -> bool:
+    def _matches_chu_gateway(cmd_str: str) -> bool:
         low = cmd_str.lower()
-        return any(tok in low for tok in _HERMES_TOKENS)
+        return any(tok in low for tok in _CHU_TOKENS)
 
     def _is_blocked_systemctl(cmd) -> bool:
         cmd_str = _cmd_to_string(cmd)
         if "systemctl" not in cmd_str:
             return False
-        if not _matches_hermes_gateway(cmd_str):
+        if not _matches_chu_gateway(cmd_str):
             return False
         try:
             tokens = _shlex.split(cmd_str)
@@ -1498,11 +1498,11 @@ def _live_system_guard(request, monkeypatch):
             head = tok.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
             if head in _PROCESS_KILLERS:
                 low = cmd_str.lower()
-                # pkill -f pattern: catch hermes-themed patterns + a
+                # pkill -f pattern: catch chu-themed patterns + a
                 # plain "python" -f which would catch the live gateway
-                # whose cmdline contains "python -m hermes_cli.main".
+                # whose cmdline contains "python -m chu_cli.main".
                 if (
-                    "hermes" in low
+                    "chu" in low
                     or "gateway" in low
                     or ("python" in low and "-f" in tokens)
                 ):
@@ -1514,7 +1514,7 @@ def _live_system_guard(request, monkeypatch):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — would mutate the "
-                "live hermes-gateway systemd unit. Mock "
+                "live chu-gateway systemd unit. Mock "
                 "subprocess.run / _run_systemctl in the test, or "
                 "mark with @pytest.mark.live_system_guard_bypass."
             )
@@ -1522,12 +1522,12 @@ def _live_system_guard(request, monkeypatch):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — process-killer command "
-                "targeting hermes/python could hit the live gateway. "
+                "targeting chu/python could hit the live gateway. "
                 "Mark with @pytest.mark.live_system_guard_bypass if "
                 "intentional."
             )
-        # Block any subprocess that would run `hermes update` (or the
-        # equivalent `python -m hermes_cli.main update`).  These commands
+        # Block any subprocess that would run `chu update` (or the
+        # equivalent `python -m chu_cli.main update`).  These commands
         # run `git fetch origin + git pull` against the REAL checkout,
         # overwriting files like pyproject.toml mid-test-run and corrupting
         # every subsequent subprocess that reads them.  The corruption is
@@ -1539,19 +1539,19 @@ def _live_system_guard(request, monkeypatch):
         cmd_str = _cmd_to_string(cmd)
         low = cmd_str.lower()
         if "update" in low and (
-            # hermes update / hermes update --gateway / setsid bash -c ... hermes update
-            ("hermes" in low and "update" in low.split())
+            # chu update / chu update --gateway / setsid bash -c ... chu update
+            ("chu" in low and "update" in low.split())
             or
-            # python -m hermes_cli.main update --gateway
-            ("hermes_cli" in low and "update" in low.split())
+            # python -m chu_cli.main update --gateway
+            ("chu_cli" in low and "update" in low.split())
             or
-            # venv/bin/hermes update  (absolute path variant used in tests)
-            (".venv/bin/hermes" in low and "update" in low)
+            # venv/bin/chu update  (absolute path variant used in tests)
+            (".venv/bin/chu" in low and "update" in low)
         ):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — this command would run "
-                "`hermes update` against the real checkout, fetching "
+                "`chu update` against the real checkout, fetching "
                 "from origin and overwriting repo files (e.g. "
                 "pyproject.toml) mid-test-run. This corrupts every "
                 "subsequent subprocess in the same runner. "
@@ -1561,17 +1561,17 @@ def _live_system_guard(request, monkeypatch):
                 "needed (e.g. an integration test testing the update "
                 "flow against a dedicated throwaway repo)."
             )
-        # Block spawning a REAL gateway runtime (``python -m hermes_cli.main
-        # gateway run|start|restart``). ``_spawn_hermes_action`` launches it
+        # Block spawning a REAL gateway runtime (``python -m chu_cli.main
+        # gateway run|start|restart``). ``_spawn_chu_action`` launches it
         # with start_new_session=True, so it outlives the pytest worker; the
-        # child inherits the pytest-tmp HERMES_HOME, resolves the DEVELOPER's
-        # ``hermes-gateway`` systemd unit (a tmp home hashes to no profile
+        # child inherits the pytest-tmp CHU_HOME, resolves the DEVELOPER's
+        # ``chu-gateway`` systemd unit (a tmp home hashes to no profile
         # suffix), restarts the live gateway, and the survivors squat the
         # webhook port. 2026-09-03: 39 such orphans lived 6 days after a
         # sibling refactor moved the spawn seam and left tests patching the
         # facade. The canonical matcher, never an argv substring.
         from gateway.status import _gateway_command_subcommand
-        # A gateway launched INSIDE a container (`docker exec … hermes gateway start`) cannot
+        # A gateway launched INSIDE a container (`docker exec … chu gateway start`) cannot
         # reach the host's systemd unit or webhook port; tests/docker/ exists to exercise it.
         in_container = _first_token_basename(cmd_str) in _CONTAINER_RUNTIMES
         if (
@@ -1582,11 +1582,11 @@ def _live_system_guard(request, monkeypatch):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"subprocess.{name}({cmd!r}) — this would spawn a REAL "
-                "hermes gateway runtime that outlives the test (it is "
+                "chu gateway runtime that outlives the test (it is "
                 "detached), restarts the developer's live gateway, and "
                 "holds the webhook port. Patch the spawn seam where "
-                "production reads it (hermes_cli.web_server_gateway."
-                "_spawn_hermes_action), or mark with "
+                "production reads it (chu_cli.web_server_gateway."
+                "_spawn_chu_action), or mark with "
                 "@pytest.mark.spawns_gateway_lookalike a test that spawns "
                 "and reaps its own stub child."
             )
@@ -1706,7 +1706,7 @@ def _audio_playback_guard(request, monkeypatch):
     """Stub TTS synthesis + speaker playback for every test.
 
     See the block comment above for the incident this closes. Defence in
-    depth behind ``_HERMES_BEHAVIORAL_VARS``: the env blanking stops the flag
+    depth behind ``_CHU_BEHAVIORAL_VARS``: the env blanking stops the flag
     leaking *between* tests, this stops the speakers ever opening even when a
     test sets the flag *itself* (which the ``voice.toggle`` RPC handler does,
     by writing ``os.environ`` directly).
@@ -1722,7 +1722,7 @@ def _audio_playback_guard(request, monkeypatch):
         return
 
     try:
-        import hermes_cli.voice as _voice
+        import chu_cli.voice as _voice
     except Exception:
         # Optional audio deps missing — nothing importable to speak with.
         yield

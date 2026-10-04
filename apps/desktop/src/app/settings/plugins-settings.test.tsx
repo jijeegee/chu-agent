@@ -65,7 +65,7 @@ describe('PluginsSettings', () => {
         name: 'Pixel Overlay',
         kind: 'disk',
         status: 'loaded',
-        file: '/home/user/.hermes/plugins/pixel-overlay/desktop/plugin.js'
+        file: '/home/user/.chu/plugins/pixel-overlay/desktop/plugin.js'
       }
     })
     $agentPlugins.set([]) // connected backend has no agent half
@@ -83,7 +83,7 @@ describe('PluginsSettings', () => {
         name: 'Pixel Overlay',
         kind: 'disk',
         status: 'loaded',
-        file: '/home/user/.hermes/plugins/pixel-overlay/desktop/plugin.js'
+        file: '/home/user/.chu/plugins/pixel-overlay/desktop/plugin.js'
       }
     })
     $agentPlugins.set([
@@ -109,7 +109,7 @@ describe('PluginsSettings', () => {
         name: 'Standalone Theme',
         kind: 'disk',
         status: 'loaded',
-        file: '/home/user/.config/hermes-desktop/desktop-plugins/standalone/plugin.js'
+        file: '/home/user/.config/chu-desktop/desktop-plugins/standalone/plugin.js'
       }
     })
     $agentPlugins.set([])

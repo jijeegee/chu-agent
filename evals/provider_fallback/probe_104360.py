@@ -6,11 +6,11 @@ os.environ.clear()
 home = tempfile.mkdtemp(prefix="hermes-104360-")
 os.environ.update(
     HOME=home,
-    HERMES_HOME=home + "/.hermes",
+    CHU_HOME=home + "/.chu",
     PATH="/usr/bin:/bin",
     PYTHONDONTWRITEBYTECODE="1",
 )
-Path(os.environ["HERMES_HOME"]).mkdir()
+Path(os.environ["CHU_HOME"]).mkdir()
 sys.dont_write_bytecode = True
 repo = sys.argv[1]
 sys.path.insert(0, repo)
@@ -96,10 +96,10 @@ config = {
     },
     "fallback_providers": [{"provider": "fixture-provider", "model": "model-b"}],
 }
-Path(os.environ["HERMES_HOME"] + "/config.yaml").write_text(
+Path(os.environ["CHU_HOME"] + "/config.yaml").write_text(
     yaml.safe_dump(config), encoding="utf-8"
 )
-from hermes_cli.runtime_provider import resolve_runtime_provider
+from chu_cli.runtime_provider import resolve_runtime_provider
 from agent.auxiliary_client import resolve_provider_client
 
 try:
@@ -146,11 +146,11 @@ rebuilt = OpenAI(**agent._client_kwargs, max_retries=0)
 request("fallback-rebuilt-from-production-kwargs", rebuilt, "model-b")
 # Configured timeout forces the production swap to rebuild before its first request.
 config["providers"]["fixture-provider"]["request_timeout_seconds"] = 15
-Path(os.environ["HERMES_HOME"] + "/config.yaml").write_text(
+Path(os.environ["CHU_HOME"] + "/config.yaml").write_text(
     yaml.safe_dump(config), encoding="utf-8"
 )
-from hermes_cli.config import load_config_readonly
-from hermes_cli.timeouts import get_provider_request_timeout
+from chu_cli.config import load_config_readonly
+from chu_cli.timeouts import get_provider_request_timeout
 
 out["timeout_resolved"] = get_provider_request_timeout("fixture-provider", "model-b")
 fb2, _ = resolve_provider_client("fixture-provider", model="model-b", raw_codex=True)
@@ -208,7 +208,7 @@ out["blocked"] = blocked
 out["production_imports"] = {
     n: sys.modules[n].__file__
     for n in [
-        "hermes_cli.runtime_provider",
+        "chu_cli.runtime_provider",
         "agent.auxiliary_client",
         "agent.client_lifecycle",
     ]

@@ -1,5 +1,5 @@
-"""Cron job scheduling for Hermes Agent: scheduled tasks (cron expressions, intervals, one-shot),
-self-scheduled reminders, isolated sessions. The gateway daemon (``hermes gateway [install]``) ticks
+"""Cron job scheduling for Chu Agent: scheduled tasks (cron expressions, intervals, one-shot),
+self-scheduled reminders, isolated sessions. The gateway daemon (``chu gateway [install]``) ticks
 the scheduler every 60 seconds; a file lock prevents duplicate execution across processes.
 """
 

@@ -488,7 +488,7 @@ class QQAdapter(BasePlatformAdapter):
             "token": f"QQBot {token}",
             "intents": (1 << 25) | (1 << 30) | (1 << 12) | (1 << 26),
             "shard": [0, 1],
-            "properties": {"$os": "macOS", "$browser": "hermes-agent", "$device": "hermes-agent"}}}
+            "properties": {"$os": "macOS", "$browser": "chu-agent", "$device": "chu-agent"}}}
         await self._send_ws_auth("Identify", payload, "Identify sent")
 
     async def _send_resume(self) -> None:
@@ -682,7 +682,7 @@ class QQAdapter(BasePlatformAdapter):
     async def _default_interaction_dispatch(self, event: InteractionEvent) -> None:
         """Default interaction callback: ``approve:<session_key>:<decision>`` →
         tools.approval.resolve_gateway_approval; ``update_prompt:<answer>`` →
-        ``~/.hermes/.update_response``; anything else is ignored at DEBUG."""
+        ``~/.chu/.update_response``; anything else is ignored at DEBUG."""
         button_data = event.button_data
         if not button_data:
             return
@@ -725,10 +725,10 @@ class QQAdapter(BasePlatformAdapter):
     @staticmethod
     def _write_update_response(answer: str, operator: str = "") -> None:
         """Atomically (tmp + rename) write the update-prompt answer to
-        ``.update_response``, polled by the detached ``hermes update --gateway`` watcher."""
+        ``.update_response``, polled by the detached ``chu update --gateway`` watcher."""
         try:
-            from hermes_constants import get_hermes_home
-            response_path = get_hermes_home() / ".update_response"
+            from chu_constants import get_chu_home
+            response_path = get_chu_home() / ".update_response"
             tmp = response_path.with_suffix(".tmp")
             tmp.write_text(answer, encoding="utf-8")
             tmp.replace(response_path)
@@ -1490,7 +1490,7 @@ class QQAdapter(BasePlatformAdapter):
         self, chat_id: str, prompt: str, default: str = "", session_key: str = "",
         metadata: Optional[Dict[str, Any]] = None) -> SendResult:
         """Yes/No update-confirmation prompt; button clicks (``update_prompt:y|n``)
-        are written to ``~/.hermes/.update_response`` by the interaction callback."""
+        are written to ``~/.chu/.update_response`` by the interaction callback."""
         del session_key, metadata  # present for contract parity only.
         default_hint = f" (default: {default})" if default else ""
         content = f"⚕ **Update Needs Your Input**\n\n{prompt}{default_hint}"

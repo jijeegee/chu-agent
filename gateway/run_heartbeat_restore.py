@@ -14,8 +14,8 @@ async def restore_heartbeat_watches(runner) -> None:
     Run all storage work off-loop so a cold profile DB cannot block adapters.
     """
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.heartbeat import HeartbeatManager
-    from hermes_constants import get_hermes_home
+    from chu_cli.heartbeat import HeartbeatManager
+    from chu_constants import get_chu_home
 
     store = runner.session_store
 
@@ -23,7 +23,7 @@ async def restore_heartbeat_watches(runner) -> None:
         restored = []
         # The poller may have been spawned by a named profile's /heartbeat command.
         # Anchor even default origins to the gateway home, not inherited context.
-        home = getattr(store, "_routing_home", None) or get_hermes_home()
+        home = getattr(store, "_routing_home", None) or get_chu_home()
         with _profile_runtime_scope(home):
             entries = store.list_sessions()
             for entry in entries:

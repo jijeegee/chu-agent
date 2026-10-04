@@ -15,7 +15,7 @@ def test_plugins_manage_install_success():
         "enabled": True,
     }
     with patch(
-        "hermes_cli.plugins_cmd.dashboard_install_plugin",
+        "chu_cli.plugins_cmd.dashboard_install_plugin",
         return_value=payload,
     ) as mock_install:
         resp = server.handle_request(
@@ -56,7 +56,7 @@ def test_plugins_manage_install_missing_identifier():
 
 def test_plugins_manage_install_failure():
     with patch(
-        "hermes_cli.plugins_cmd.dashboard_install_plugin",
+        "chu_cli.plugins_cmd.dashboard_install_plugin",
         return_value={"ok": False, "error": "Git clone failed"},
     ):
         resp = server.handle_request(
@@ -78,7 +78,7 @@ def test_plugins_manage_install_catalog_name_only():
     """A catalog pick needs no identifier — the backend resolves repo + pin."""
     payload = {"ok": True, "plugin_name": "weather-plugin", "enabled": False}
     with patch(
-        "hermes_cli.plugins_cmd.dashboard_install_plugin",
+        "chu_cli.plugins_cmd.dashboard_install_plugin",
         return_value=payload,
     ) as mock_install:
         resp = server.handle_request(
@@ -104,7 +104,7 @@ def test_plugins_manage_install_catalog_name_only():
 
 def test_plugins_manage_update_requires_catalog_sidecar(tmp_path, monkeypatch):
     """Non-catalog installs are refused — their update flows stay CLI-owned."""
-    import hermes_cli.plugins_cmd as plugins_cmd
+    import chu_cli.plugins_cmd as plugins_cmd
 
     plugins_root = tmp_path / "plugins"
     (plugins_root / "plain-git-plugin").mkdir(parents=True)

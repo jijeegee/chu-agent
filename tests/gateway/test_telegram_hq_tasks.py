@@ -89,7 +89,7 @@ def test_bare_source_and_callback_cannot_claim_task_authority(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_task_dispatch_is_durable_and_never_gateway_control(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     dispatched = []
     for m in [message(), message(),
               message("HQ_TASK job-1\nChanged instructions", mid=2),
@@ -119,7 +119,7 @@ async def test_task_dispatch_is_durable_and_never_gateway_control(tmp_path, monk
 
 @pytest.mark.asyncio
 async def test_task_preserves_channel_policy(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     a = adapter({"channel_prompts": {"123": "Keep the channel safety policy."}})
     a.handle_message = AsyncMock()
     m = message()
@@ -145,7 +145,7 @@ def test_sqlite_claim_is_atomic_across_connections(tmp_path, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from plugins.platforms.telegram.telegram_hq import claim_task
     import sqlite3
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     with ThreadPoolExecutor(max_workers=8) as pool:
         outcomes = list(pool.map(lambda _: claim_task(message(), HQ), range(16)))
     assert sum(outcomes) == 1
@@ -156,7 +156,7 @@ def test_sqlite_claim_is_atomic_across_connections(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_crash_after_claim_does_not_retry(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     m = message()
     update = SimpleNamespace(effective_message=m, message=m, update_id=1)
     a = adapter()
@@ -171,7 +171,7 @@ async def test_crash_after_claim_does_not_retry(tmp_path, monkeypatch):
 
 def test_nested_extra_config_reaches_real_adapter(tmp_path, monkeypatch):
     from gateway.config import load_gateway_config
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text(f"telegram:\n  extra:\n    hq_bot_id: {HQ}\n", encoding="utf-8")
     config = load_gateway_config()
     a = TelegramAdapter(config.platforms[Platform.TELEGRAM])
@@ -182,7 +182,7 @@ def test_real_telegram_sdk_ingress_in_fresh_process(tmp_path, monkeypatch):
     """The suite stubs telegram in-process; probe real PTB without its test stubs."""
     import subprocess
     import sys
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     probe = f"HQ = {HQ}\n" + r'''
 import asyncio
 from telegram import Message
@@ -220,7 +220,7 @@ asyncio.run(main())
 @pytest.mark.asyncio
 async def test_corrupt_claim_store_fails_closed(tmp_path, monkeypatch):
     import sqlite3
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path))
     (tmp_path / "telegram_hq_tasks.sqlite3").write_bytes(b"not a sqlite database")
     a = adapter()
     a.handle_message = AsyncMock()

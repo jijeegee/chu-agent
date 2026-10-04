@@ -26,14 +26,14 @@ const KIND_ORDER: Record<PluginRecord['kind'], number> = { disk: 0, runtime: 1, 
 export const pluginElementId = (target: string) => `plugin-${target}`
 
 function reveal(file: string) {
-  void window.hermesDesktop?.revealPath?.(file)?.catch(() => undefined)
+  void window.chuDesktop?.revealPath?.(file)?.catch(() => undefined)
 }
 
 async function revealPluginsDir() {
   try {
     // Electron owns the local plugin root — deriving it from the backend's
-    // hermes_home breaks against a remote backend (#66899).
-    const dir = await window.hermesDesktop?.desktopPluginsRoot?.()
+    // chu_home breaks against a remote backend (#66899).
+    const dir = await window.chuDesktop?.desktopPluginsRoot?.()
 
     if (!dir) {
       notifyError('Desktop plugins are unavailable', 'Could not resolve the plugins folder')
@@ -43,7 +43,7 @@ async function revealPluginsDir() {
 
     // openDir (not reveal): the door often doesn't exist on first use, and
     // showItemInFolder on a missing path silently no-ops (esp. Windows).
-    const result = await window.hermesDesktop?.openDir?.(dir)
+    const result = await window.chuDesktop?.openDir?.(dir)
 
     if (result && !result.ok) {
       notifyError(result.error ?? 'unknown error', 'Could not open the plugins folder')
@@ -84,7 +84,7 @@ function PluginLine({
 }
 
 /** Folder name when a desktop plugin entry lives in the UNIFIED agent-plugins
- *  root (`~/.hermes/plugins/<name>/desktop/plugin.js`) — i.e. it is the
+ *  root (`~/.chu/plugins/<name>/desktop/plugin.js`) — i.e. it is the
  *  desktop half of a bundled agent+desktop package. Null for standalone
  *  desktop plugins. */
 function unifiedPackageName(file?: string): null | string {
@@ -110,7 +110,7 @@ async function repairAgentHalf(record: PluginRecord, packageName: string) {
   try {
     const pluginDir = record.file?.replace(/[\\/]desktop[\\/]plugin\.js$/, '')
 
-    const raw = pluginDir ? await window.hermesDesktop?.readFileText?.(`${pluginDir}/.hermes-catalog.json`) : null
+    const raw = pluginDir ? await window.chuDesktop?.readFileText?.(`${pluginDir}/.chu-catalog.json`) : null
 
     if (raw) {
       const sidecar = JSON.parse(typeof raw === 'string' ? raw : ((raw as { content?: string }).content ?? '')) as {

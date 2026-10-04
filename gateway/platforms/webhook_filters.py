@@ -23,28 +23,28 @@ def _stringify_filter_value(value: Any) -> str:
 
 
 def _resolve_profile_path(path_value: Any) -> Optional[Path]:
-    """Resolve a user path, mapping ~/.hermes to the active profile home."""
+    """Resolve a user path, mapping ~/.chu to the active profile home."""
     if not isinstance(path_value, str):
         return None
     raw = os.path.expandvars(path_value.strip())
     if not raw:
         return None
-    from hermes_constants import get_hermes_home
-    hermes_home = get_hermes_home()
-    if raw == "~/.hermes" or raw.startswith("~/.hermes/"):
-        return hermes_home / raw[len("~/.hermes/"):]
+    from chu_constants import get_chu_home
+    chu_home = get_chu_home()
+    if raw == "~/.chu" or raw.startswith("~/.chu/"):
+        return chu_home / raw[len("~/.chu/"):]
     path = Path(raw).expanduser()
-    return path if path.is_absolute() else hermes_home / path
+    return path if path.is_absolute() else chu_home / path
 
 
 def _resolve_script_path(script_value: Any) -> tuple[Optional[Path], Optional[str]]:
-    """Resolve a route script; must live under HERMES_HOME/scripts."""
+    """Resolve a route script; must live under CHU_HOME/scripts."""
     if not isinstance(script_value, str) or not script_value.strip():
         return None, "script path is empty"
-    from hermes_constants import get_hermes_home
-    scripts_root = (get_hermes_home() / "scripts").resolve()
+    from chu_constants import get_chu_home
+    scripts_root = (get_chu_home() / "scripts").resolve()
     raw_text = os.path.expandvars(script_value.strip())
-    if raw_text == "~/.hermes" or raw_text.startswith("~/.hermes/"):
+    if raw_text == "~/.chu" or raw_text.startswith("~/.chu/"):
         mapped = _resolve_profile_path(raw_text)
         candidate = mapped.resolve() if mapped is not None else scripts_root
     else:
@@ -169,7 +169,7 @@ class WebhookRouteProcessor:
     def run_route_script(self, script_value: Any, payload: dict) -> tuple[bool, Optional[dict]]:
         """Run a route script and return (should_continue, transformed_payload).
 
-        Non-zero exit, empty/``[SILENT]`` stdout, or a ``[SILENT]``/``__hermes_ignore__`` flag drops the
+        Non-zero exit, empty/``[SILENT]`` stdout, or a ``[SILENT]``/``__chu_ignore__`` flag drops the
         webhook; JSON-object stdout replaces the payload, other text is attached as ``script_output``.
         """
         path, error = _resolve_script_path(script_value)
@@ -212,5 +212,5 @@ class WebhookRouteProcessor:
         if not isinstance(transformed, dict):
             logger.warning("[webhook] script stdout must be a JSON object or text")
             return False, None
-        silenced = transformed.get("[SILENT]") is True or transformed.get("__hermes_ignore__") is True
+        silenced = transformed.get("[SILENT]") is True or transformed.get("__chu_ignore__") is True
         return (False, None) if silenced else (True, transformed)

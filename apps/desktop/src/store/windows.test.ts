@@ -12,8 +12,8 @@ import {
   openSessionInNewWindow
 } from './windows'
 
-const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
-const initialHermesDesktop = desktopWindow.hermesDesktop
+const desktopWindow = window as unknown as { chuDesktop?: Window['chuDesktop'] }
+const initialChuDesktop = desktopWindow.chuDesktop
 
 const notifyError = vi.fn()
 
@@ -22,15 +22,15 @@ vi.mock('./notifications', () => ({
 }))
 
 function installBridge(
-  openSessionWindow?: Window['hermesDesktop']['openSessionWindow'],
-  openWindow?: Window['hermesDesktop']['openWindow'],
-  openBrowserWindow?: Window['hermesDesktop']['openBrowserWindow']
+  openSessionWindow?: Window['chuDesktop']['openSessionWindow'],
+  openWindow?: Window['chuDesktop']['openWindow'],
+  openBrowserWindow?: Window['chuDesktop']['openBrowserWindow']
 ) {
-  desktopWindow.hermesDesktop = {
+  desktopWindow.chuDesktop = {
     ...(openSessionWindow ? { openSessionWindow } : {}),
     ...(openWindow ? { openWindow } : {}),
     ...(openBrowserWindow ? { openBrowserWindow } : {})
-  } as unknown as Window['hermesDesktop']
+  } as unknown as Window['chuDesktop']
 }
 
 beforeEach(() => {
@@ -38,16 +38,16 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  if (initialHermesDesktop) {
-    desktopWindow.hermesDesktop = initialHermesDesktop
+  if (initialChuDesktop) {
+    desktopWindow.chuDesktop = initialChuDesktop
   } else {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
   }
 })
 
 describe('canOpenSessionWindow', () => {
   it('is false when the desktop bridge is absent', () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
     expect(canOpenSessionWindow()).toBe(false)
   })
 
@@ -83,7 +83,7 @@ describe('openSessionInNewWindow', () => {
   })
 
   it('no-ops gracefully when the bridge is absent (web fallback)', async () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
 
     await openSessionInNewWindow('s1')
 
@@ -123,7 +123,7 @@ describe('openSessionInNewWindow', () => {
 
 describe('canOpenNewWindow', () => {
   it('is false when the desktop bridge is absent', () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
     expect(canOpenNewWindow()).toBe(false)
   })
 
@@ -140,7 +140,7 @@ describe('canOpenNewWindow', () => {
 
 describe('openNewWindow', () => {
   it('no-ops gracefully when the bridge is absent (web fallback)', async () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
 
     await openNewWindow()
 
@@ -176,7 +176,7 @@ describe('openNewWindow', () => {
 
 describe('canOpenBrowserWindow', () => {
   it('is false when the desktop bridge is absent', () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
     expect(canOpenBrowserWindow()).toBe(false)
   })
 
@@ -202,7 +202,7 @@ describe('openBrowserInNewWindow', () => {
   })
 
   it('returns false when the bridge is absent', async () => {
-    delete desktopWindow.hermesDesktop
+    delete desktopWindow.chuDesktop
 
     expect(await openBrowserInNewWindow('tab-1')).toBe(false)
     expect(notifyError).not.toHaveBeenCalled()

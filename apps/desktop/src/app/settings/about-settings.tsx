@@ -123,7 +123,7 @@ export function AboutSettings() {
                     <p className="mt-1 text-xs text-muted-foreground">{a.bundleSwapPendingDesc}</p>
                     <Button
                       className="mt-2"
-                      onClick={() => void window.hermesDesktop?.relaunchApp?.()}
+                      onClick={() => void window.chuDesktop?.relaunchApp?.()}
                       size="sm"
                       variant="textStrong"
                     >
@@ -140,7 +140,7 @@ export function AboutSettings() {
                         href={INSTALLER_URL}
                         onClick={event => {
                           event.preventDefault()
-                          void window.hermesDesktop?.openExternal?.(INSTALLER_URL)
+                          void window.chuDesktop?.openExternal?.(INSTALLER_URL)
                         }}
                         rel="noreferrer"
                         target="_blank"
@@ -210,7 +210,7 @@ export function AboutSettings() {
                 href={RELEASE_NOTES_URL}
                 onClick={event => {
                   event.preventDefault()
-                  void window.hermesDesktop?.openExternal?.(RELEASE_NOTES_URL)
+                  void window.chuDesktop?.openExternal?.(RELEASE_NOTES_URL)
                 }}
                 rel="noreferrer"
                 target="_blank"

@@ -21,12 +21,12 @@ def server():
     with patch.dict(
         "sys.modules",
         {
-            "hermes_constants": MagicMock(
-                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_moa_emit")
+            "chu_constants": MagicMock(
+                get_chu_home=MagicMock(return_value="/tmp/chu_test_moa_emit")
             ),
-            "hermes_cli.env_loader": MagicMock(),
-            "hermes_cli.banner": MagicMock(),
-            "hermes_state": MagicMock(),
+            "chu_cli.env_loader": MagicMock(),
+            "chu_cli.banner": MagicMock(),
+            "chu_state": MagicMock(),
         },
     ):
         import importlib

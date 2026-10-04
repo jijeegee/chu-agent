@@ -1,4 +1,4 @@
-"""Tests for acp_adapter.server — HermesACPAgent ACP server."""
+"""Tests for acp_adapter.server — ChuACPAgent ACP server."""
 
 import asyncio
 import os
@@ -38,11 +38,11 @@ from acp.schema import (
 from acp_adapter.auth import TERMINAL_SETUP_AUTH_METHOD_ID
 from acp_adapter.model_catalog import ACP_MAX_MODELS_PER_PROVIDER
 from acp_adapter.server import (
-    HermesACPAgent,
-    HERMES_VERSION,
+    ChuACPAgent,
+    CHU_VERSION,
 )
 from acp_adapter.session import SessionManager
-from hermes_state import SessionDB
+from chu_state import SessionDB
 
 
 @pytest.fixture()
@@ -53,8 +53,8 @@ def mock_manager():
 
 @pytest.fixture()
 def agent(mock_manager):
-    """HermesACPAgent backed by a mock session manager."""
-    return HermesACPAgent(session_manager=mock_manager)
+    """ChuACPAgent backed by a mock session manager."""
+    return ChuACPAgent(session_manager=mock_manager)
 
 
 @pytest.mark.asyncio
@@ -98,7 +98,7 @@ def _effort_option(options):
 
 @pytest.mark.asyncio
 async def test_new_session_advertises_reasoning_effort_thought_level_select(agent):
-    from hermes_constants import VALID_REASONING_EFFORTS
+    from chu_constants import VALID_REASONING_EFFORTS
 
     resp = await agent.new_session(cwd="/tmp")
     opt = _effort_option(resp.config_options)
@@ -149,7 +149,7 @@ async def test_switch_model_keeps_session_reasoning_effort(agent):
     await agent.set_config_option("reasoning_effort", resp.session_id, "xhigh")
 
     with patch.object(
-        HermesACPAgent, "_resolve_model_selection", staticmethod(lambda raw, prov: ("openrouter", raw))
+        ChuACPAgent, "_resolve_model_selection", staticmethod(lambda raw, prov: ("openrouter", raw))
     ):
         agent._switch_model(state, "some/other-model")
 
@@ -258,7 +258,7 @@ class TestSessionOps:
                 base_url="https://api.openai.com/v1",
             )
         )
-        acp_agent = HermesACPAgent(session_manager=manager)
+        acp_agent = ChuACPAgent(session_manager=manager)
         picker_context = MagicMock()
         picker_context.with_overrides.return_value = picker_context
         payload = {
@@ -280,8 +280,8 @@ class TestSessionOps:
         }
 
         with (
-            patch("hermes_cli.inventory.load_picker_context", return_value=picker_context),
-            patch("hermes_cli.inventory.build_models_payload", return_value=payload) as build_payload,
+            patch("chu_cli.inventory.load_picker_context", return_value=picker_context),
+            patch("chu_cli.inventory.build_models_payload", return_value=payload) as build_payload,
         ):
             resp = await acp_agent.new_session(cwd="/tmp")
 
@@ -486,10 +486,10 @@ class TestPrompt:
         """The ACP prompt path must bridge the session id into child subprocesses.
 
         Regression: ``set_session_vars`` was called with ``session_key`` only,
-        leaving the ``HERMES_SESSION_ID`` ContextVar bound to the explicit ""
+        leaving the ``CHU_SESSION_ID`` ContextVar bound to the explicit ""
         default. Once the session-context machinery is engaged, that empty value
         is authoritative — so ``_make_run_env`` handed child subprocesses an
-        empty ``HERMES_SESSION_ID`` instead of the session's own id.
+        empty ``CHU_SESSION_ID`` instead of the session's own id.
         """
         from tools.environments.local import _make_run_env
 
@@ -500,7 +500,7 @@ class TestPrompt:
 
         def _run(*args, **kwargs):
             # Runs inside the session context copy set up by prompt().
-            captured["child"] = _make_run_env({}).get("HERMES_SESSION_ID")
+            captured["child"] = _make_run_env({}).get("CHU_SESSION_ID")
             return {"final_response": "ok", "messages": []}
 
         state.agent.run_conversation = _run
@@ -696,7 +696,7 @@ class TestRegisterSessionMcpServers:
 
         state = mock_manager.create_session(cwd="/tmp")
         # Give the mock agent the attributes _register_session_mcp_servers reads
-        state.agent.enabled_toolsets = ["hermes-acp"]
+        state.agent.enabled_toolsets = ["chu-acp"]
         state.agent.disabled_toolsets = None
         state.agent.tools = []
         state.agent.valid_tool_names = set()
@@ -730,7 +730,7 @@ class TestRegisterSessionMcpServers:
         from acp.schema import McpServerStdio
 
         state = mock_manager.create_session(cwd="/tmp")
-        state.agent.enabled_toolsets = ["hermes-acp"]
+        state.agent.enabled_toolsets = ["chu-acp"]
         state.agent.disabled_toolsets = None
         state.agent.tools = []
         state.agent.valid_tool_names = set()
@@ -759,11 +759,11 @@ class TestRegisterSessionMcpServers:
             await agent._register_session_mcp_servers(state, [server])
 
         mock_defs.assert_called_once_with(
-            enabled_toolsets=["hermes-acp", "mcp-srv"],
+            enabled_toolsets=["chu-acp", "mcp-srv"],
             disabled_toolsets=None,
             quiet_mode=True,
         )
-        assert state.agent.enabled_toolsets == ["hermes-acp", "mcp-srv"]
+        assert state.agent.enabled_toolsets == ["chu-acp", "mcp-srv"]
         assert state.agent.tools is fake_tools
         assert state.agent.tools[-1] == {
             "type": "function",

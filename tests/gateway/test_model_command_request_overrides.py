@@ -41,11 +41,11 @@ async def test_handle_model_command_stores_request_overrides_for_named_custom_pr
     monkeypatch,
 ):
     import gateway.run as gateway_run
-    from hermes_cli.model_switch import ModelSwitchResult
+    from chu_cli.model_switch import ModelSwitchResult
 
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text(
+    chu_home = tmp_path / ".chu"
+    chu_home.mkdir()
+    (chu_home / "config.yaml").write_text(
         """
 model:
   default: gpt-5.4
@@ -62,10 +62,10 @@ custom_providers:
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
+    monkeypatch.setattr(gateway_run, "_chu_home", chu_home)
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model",
+        "chu_cli.model_switch.switch_model",
         lambda **kw: ModelSwitchResult(
             success=True,
             new_model="rotator-openrouter-coding",

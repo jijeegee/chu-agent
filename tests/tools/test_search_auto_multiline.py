@@ -9,7 +9,7 @@ from tools.file_tools import search_tool
 
 @pytest.fixture
 def proj(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("CHU_HOME", str(tmp_path / ".chu"))
     d = tmp_path / "proj"
     d.mkdir()
     (d / "mod.py").write_text(

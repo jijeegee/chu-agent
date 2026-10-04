@@ -5,7 +5,7 @@ import sqlite3
 import unicodedata
 from contextlib import closing
 
-from hermes_constants import get_hermes_home
+from chu_constants import get_chu_home
 
 
 def task_envelope(message, configured_id):
@@ -47,7 +47,7 @@ def message_verdict(message, extra):
 def claim_task(message, configured_id):
     """Commit before dispatch; claims are permanent, including after crashes.
 
-    Scope: this Hermes home + HQ bot, across all chats. Body dedup uses NFC and
+    Scope: this Chu home + HQ bot, across all chats. Body dedup uses NFC and
     collapsed Unicode whitespace (case-sensitive). No task body is stored.
     This is at-most-once dispatch, not exactly-once execution or automatic retry.
     SQLite uniqueness arbitrates competing processes, with FULL sync durability.
@@ -59,7 +59,7 @@ def claim_task(message, configured_id):
     task_id, body = envelope
     normalized = " ".join(unicodedata.normalize("NFC", body).split())
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-    home = get_hermes_home()
+    home = get_chu_home()
     home.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(home / "telegram_hq_tasks.sqlite3", timeout=10)) as db:
         db.execute("PRAGMA synchronous=FULL")

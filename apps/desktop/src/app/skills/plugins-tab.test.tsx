@@ -78,7 +78,7 @@ describe('PluginsTab', () => {
           sha: 'a'.repeat(40),
           subdir: '',
           tier: 'community',
-          type: 'hermes-plugin-pick'
+          type: 'chu-plugin-pick'
         },
         origin: 'https://hermes-agent.nousresearch.com'
       })
@@ -103,7 +103,7 @@ describe('PluginsTab', () => {
         data: {
           name: 'evil-plugin',
           repo: 'https://github.com/evil/evil-plugin',
-          type: 'hermes-plugin-pick'
+          type: 'chu-plugin-pick'
         },
         origin: 'https://evil.example.com'
       })
@@ -173,7 +173,7 @@ describe('PluginsTab', () => {
           name: 'nested-plugin',
           repo: 'https://github.com/example/plugins-monorepo',
           subdir: 'nested-plugin',
-          type: 'hermes-plugin-pick'
+          type: 'chu-plugin-pick'
         },
         origin: 'https://hermes-agent.nousresearch.com'
       })
@@ -269,7 +269,7 @@ describe('PluginsTab catalog UX', () => {
         data: {
           name: 'demo-weather',
           repo: 'https://github.com/example/demo-weather',
-          type: 'hermes-plugin-pick'
+          type: 'chu-plugin-pick'
         },
         origin: 'https://hermes-agent.nousresearch.com'
       })
@@ -302,7 +302,7 @@ describe('PluginsTab catalog UX', () => {
         data: {
           name: 'demo-weather',
           repo: 'https://github.com/example/demo-weather',
-          type: 'hermes-plugin-pick'
+          type: 'chu-plugin-pick'
         },
         origin: 'https://hermes-agent.nousresearch.com'
       })
